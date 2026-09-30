@@ -25,6 +25,34 @@
   </ol>
 
   <main>
+    <section class="card" id="tableau">
+      <h2>Tableau</h2>
+      <p class="hint">Hôtel des ventes, carte en cours et monstres. Une case reste vide tant que la signature n'est pas confirmée sur la version du client. Rien n'est inventé.</p>
+      <div class="board">
+        <article>
+          <header>
+            <h3>Hôtel des ventes</h3>
+            <span class="tag unknown" id="tag-hotel">signature inconnue</span>
+          </header>
+          <div id="board-hotel"></div>
+        </article>
+        <article>
+          <header>
+            <h3>Carte en cours</h3>
+            <span class="tag unknown" id="tag-map">signature inconnue</span>
+          </header>
+          <div id="board-map"></div>
+        </article>
+        <article>
+          <header>
+            <h3>Monstres</h3>
+            <span class="tag unknown" id="tag-monsters">signature inconnue</span>
+          </header>
+          <div id="board-monsters"></div>
+        </article>
+      </div>
+    </section>
+
     <section class="card" id="reglages">
       <h2>Réglages</h2>
       <form id="config-form">
@@ -100,11 +128,6 @@
       <div id="versions"></div>
     </section>
 
-    <section class="card">
-      <h2>Ce qui a été reconnu</h2>
-      <p class="hint" id="journal-empty">Rien pour l'instant. C'est normal tant que la table de détection n'a pas de signature confirmée.</p>
-      <div id="journal"></div>
-    </section>
   </main>
   <script src="app.js"></script>
 </body>

@@ -277,36 +277,95 @@ async function refreshRules() {
   }
 }
 
-async function refreshJournal() {
-  const body = await api("/api/journal");
-  const root = $("journal");
-  const empty = $("journal-empty");
-  root.replaceChildren();
-  const prices = body.prices || [];
-  const observations = body.observations || [];
-  empty.hidden = prices.length + observations.length > 0;
-  if (body.error) {
-    empty.hidden = false;
-    empty.textContent = body.error;
+function setTag(id, ready) {
+  const tag = $(id);
+  tag.className = "tag " + (ready ? "captured" : "unknown");
+  tag.textContent = ready ? "signature active" : "signature inconnue";
+}
+
+function emptyNote(parent, text) {
+  const note = document.createElement("p");
+  note.className = "hint";
+  note.textContent = text;
+  parent.append(note);
+}
+
+function fillTable(parent, headers, rows) {
+  const table = document.createElement("table");
+  const head = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  for (const header of headers) {
+    const cell = document.createElement("th");
+    cell.textContent = header;
+    headRow.append(cell);
   }
-  if (prices.length) {
-    const table = document.createElement("table");
-    table.innerHTML = "<thead><tr><th>Serveur</th><th>Objet</th><th>Source</th><th>Lot</th><th>Total</th><th>Unitaire</th></tr></thead>";
-    const tbody = document.createElement("tbody");
-    for (const price of prices) {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `<td></td><td></td><td></td><td></td><td></td><td></td>`;
-      const cells = tr.children;
-      cells[0].textContent = price.server ?? "";
-      cells[1].textContent = String(price.itemId ?? "");
-      cells[2].textContent = price.source ?? "";
-      cells[3].textContent = String(price.quantity ?? "");
-      cells[4].textContent = price.total ?? "";
-      cells[5].textContent = price.unit ?? "";
-      tbody.append(tr);
+  head.append(headRow);
+  const body = document.createElement("tbody");
+  for (const row of rows) {
+    const line = document.createElement("tr");
+    for (const value of row) {
+      const cell = document.createElement("td");
+      cell.textContent = value ?? "";
+      line.append(cell);
     }
-    table.append(tbody);
-    root.append(table);
+    body.append(line);
+  }
+  table.append(head, body);
+  parent.append(table);
+}
+
+async function refreshBoard() {
+  const body = await api("/api/board");
+  const detection = body.detection || {};
+  setTag("tag-hotel", detection.hotel === "ready");
+  setTag("tag-map", detection.map === "ready");
+  setTag("tag-monsters", detection.monsters === "ready");
+
+  const hotel = $("board-hotel");
+  hotel.replaceChildren();
+  const prices = body.prices || [];
+  if (!prices.length) {
+    emptyNote(hotel, detection.hotel === "ready"
+      ? "Signature active. Aucun prix vu pour l'instant."
+      : "Aucun prix. Les moyennes et les lots ne sont pas encore signés.");
+  } else {
+    fillTable(hotel, ["Serveur", "Objet", "Source", "Lot", "Total", "Unitaire"], prices.map((price) => [
+      price.server,
+      String(price.itemId ?? ""),
+      price.source,
+      String(price.quantity ?? ""),
+      price.total ?? "",
+      price.unit ?? ""
+    ]));
+  }
+
+  const map = $("board-map");
+  map.replaceChildren();
+  const places = body.places || [];
+  if (!places.length) {
+    emptyNote(map, detection.map === "ready"
+      ? "Signature active. Aucune carte lue pour l'instant."
+      : "Aucune carte. La position n'est pas encore signée.");
+  } else {
+    fillTable(map, ["Personnage", "Serveur", "Position"], places.map((place) => [
+      place.character || place.connectionId,
+      place.server || "",
+      place.position || "inconnue"
+    ]));
+  }
+
+  const monsters = $("board-monsters");
+  monsters.replaceChildren();
+  const encounters = body.encounters || [];
+  if (!encounters.length) {
+    emptyNote(monsters, detection.monsters === "ready"
+      ? "Signature active. Aucun combat lu pour l'instant."
+      : "Aucun monstre. Le combat n'est pas encore signé.");
+  } else {
+    fillTable(monsters, ["Personnage", "Combat"], encounters.map((encounter) => [
+      encounter.character || encounter.connectionId,
+      encounter.combat
+    ]));
   }
 }
 
@@ -395,6 +454,7 @@ async function tick() {
     await refreshLog();
     if (state.armed || state.running)
       await refreshCaptures();
+    await refreshBoard();
   } catch (error) {
     $("status-pill").textContent = "Page déconnectée";
     $("status-pill").className = "status bad";
@@ -403,7 +463,7 @@ async function tick() {
 }
 
 loadConfig()
-  .then(() => Promise.all([refreshStatus(), refreshConnections(), refreshCaptures(), refreshRules(), refreshJournal(), refreshHosts(), refreshLog()]))
+  .then(() => Promise.all([refreshStatus(), refreshConnections(), refreshCaptures(), refreshRules(), refreshBoard(), refreshHosts(), refreshLog()]))
   .catch((error) => showError(error.message));
 
 setInterval(tick, 1500);

@@ -163,6 +163,8 @@ public sealed class LocalServer : IAsyncDisposable
 
         app.MapGet("/api/journal", () => Results.Ok(dashboard.Journal()));
 
+        app.MapGet("/api/board", () => Results.Ok(dashboard.Board()));
+
         app.MapGet("/api/connections", () => Results.Ok(ConnectionSurvey.EstablishedRemotes()));
 
         app.MapGet("/api/hosts", () =>

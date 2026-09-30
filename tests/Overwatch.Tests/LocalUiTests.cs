@@ -5,6 +5,8 @@ using System.Text;
 using System.Text.Json;
 using Overwatch.Config;
 using Overwatch.Decode;
+using Overwatch.Market;
+using Overwatch.Persist;
 using Overwatch.Proxy;
 using Overwatch.Ui;
 
@@ -12,6 +14,51 @@ namespace Overwatch.Tests;
 
 public class LocalUiTests
 {
+    [Fact]
+    public void The_board_stays_empty_until_a_signature_is_captured()
+    {
+        var unknown = RuleCompiler.Compile(RuleLoader.Parse("""
+            client: dofus3
+            detection:
+              - version: "3.6.11.13"
+                status: unknown
+                pending: [average_prices, position, combat]
+                rules: []
+            rules: []
+            """));
+        var board = BoardComposer.Compose(unknown, Array.Empty<PriceRow>(), Array.Empty<SessionRow>());
+        var json = JsonSerializer.Serialize(board);
+        Assert.Contains("\"hotel\":\"unknown\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"map\":\"unknown\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"monsters\":\"unknown\"", json, StringComparison.Ordinal);
+
+        var ready = RuleCompiler.Compile(RuleLoader.Parse("""
+            detection:
+              - version: "3.6.11.13"
+                status: captured
+                rules:
+                  - id: lieu
+                    kind: position
+                    direction: s2c
+                    min_length: 2
+                    max_length: 2
+                    header_hex: "01"
+                    extract:
+                      - name: place
+                        offset: 1
+                        type: uint8
+            """));
+        var seen = BoardComposer.Compose(ready, Array.Empty<PriceRow>(), new[]
+        {
+            new SessionRow("abc", "hellmina", "Araignee", null, "4,-20", "1 tour", DateTimeOffset.UnixEpoch)
+        });
+        var seenJson = JsonSerializer.Serialize(seen);
+        Assert.Contains("\"map\":\"ready\"", seenJson, StringComparison.Ordinal);
+        Assert.Contains("4,-20", seenJson, StringComparison.Ordinal);
+        Assert.Contains("1 tour", seenJson, StringComparison.Ordinal);
+        Assert.Contains("\"hotel\":\"unknown\"", seenJson, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Config_roundtrip_keeps_the_addresses()
     {

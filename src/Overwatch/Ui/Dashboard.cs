@@ -277,6 +277,31 @@ public sealed class Dashboard : IAsyncDisposable
         }
     }
 
+    public object Board()
+    {
+        try
+        {
+            var config = Load();
+            var file = File.Exists(config.RulesPath) ? RuleLoader.LoadFile(config.RulesPath) : new RuleFile();
+            var rules = RuleCompiler.Compile(file);
+            var path = SqlitePath();
+            var prices = File.Exists(path) ? SqliteSink.ReadPrices(path) : new List<PriceRow>();
+            var sessions = File.Exists(path) ? SqliteSink.ReadSessions(path) : new List<SessionRow>();
+            return BoardComposer.Compose(rules, prices, sessions);
+        }
+        catch (Exception exception) when (exception is ConfigException or IOException or Microsoft.Data.Sqlite.SqliteException or YamlDotNet.Core.YamlException)
+        {
+            return new
+            {
+                error = exception.Message,
+                detection = new { hotel = "unknown", map = "unknown", monsters = "unknown" },
+                prices = Array.Empty<object>(),
+                places = Array.Empty<object>(),
+                encounters = Array.Empty<object>()
+            };
+        }
+    }
+
     public object Journal()
     {
         try

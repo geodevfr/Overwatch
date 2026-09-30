@@ -217,6 +217,33 @@ public sealed class SqliteSink
         return rows;
     }
 
+    public static List<SessionRow> ReadSessions(string path)
+    {
+        var rows = new List<SessionRow>();
+        using var connection = new SqliteConnection($"Data Source={path}");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT connection_id, server_key, character_name, window_title, position, combat, updated_at
+            FROM sessions
+            ORDER BY updated_at;
+            """;
+        using var result = command.ExecuteReader();
+        while (result.Read())
+        {
+            rows.Add(new SessionRow(
+                result.GetString(0),
+                result.IsDBNull(1) ? null : result.GetString(1),
+                result.IsDBNull(2) ? null : result.GetString(2),
+                result.IsDBNull(3) ? null : result.GetString(3),
+                result.IsDBNull(4) ? null : result.GetString(4),
+                result.IsDBNull(5) ? null : result.GetString(5),
+                DateTimeOffset.Parse(result.GetString(6), CultureInfo.InvariantCulture)));
+        }
+
+        return rows;
+    }
+
     private void Flush(SqliteConnection connection, List<StoredWork> batch)
     {
         using var transaction = connection.BeginTransaction();
