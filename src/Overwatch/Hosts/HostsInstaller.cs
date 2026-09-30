@@ -4,6 +4,27 @@ namespace Overwatch.Hosts;
 
 public static class HostsInstaller
 {
+    /// <summary>
+    /// Au lancement du processus, retire un bloc laissé par un arrêt brutal.
+    /// Sans droit d'écriture, retourne un message et ne lance pas d'exception.
+    /// </summary>
+    public static string? SweepLeftover(string? hostsPath)
+    {
+        var path = string.IsNullOrWhiteSpace(hostsPath) ? HostsFileManager.DefaultPath : hostsPath;
+        try
+        {
+            var manager = new HostsFileManager(path, new HostsJournal(HostsJournal.DefaultPath));
+            if (!manager.ContainsManagedBlock())
+                return null;
+            var removed = manager.Remove();
+            return removed.Ok ? null : ExplainFailure(removed.Detail);
+        }
+        catch (Exception exception)
+        {
+            return ExplainFailure(exception.Message);
+        }
+    }
+
     public static HostsAttachResult Attach(AppConfig config)
     {
         var path = string.IsNullOrWhiteSpace(config.Hosts.Path) ? HostsFileManager.DefaultPath : config.Hosts.Path;

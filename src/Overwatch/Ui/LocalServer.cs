@@ -46,6 +46,7 @@ public sealed class LocalServer : IAsyncDisposable
             ?? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(configPath)) ?? AppContext.BaseDirectory, "captures");
         var captures = new CaptureRecorder(captureDirectory);
         var dashboard = new Dashboard(configPath, captures);
+        dashboard.NoteHostsWarning(SweepHosts(configPath));
 
         var assemblyDir = Path.GetDirectoryName(typeof(LocalServer).Assembly.Location) ?? AppContext.BaseDirectory;
         var webRoot = options.WebRoot ?? Path.Combine(assemblyDir, "wwwroot");
@@ -201,6 +202,21 @@ public sealed class LocalServer : IAsyncDisposable
                 ? Results.Ok(new { detail = attempt.Detail })
                 : Results.BadRequest(new { error = attempt.Detail });
         });
+    }
+
+    private static string? SweepHosts(string configPath)
+    {
+        try
+        {
+            string? hostsPath = null;
+            if (File.Exists(configPath))
+                hostsPath = ConfigLoader.Load(configPath).Hosts.Path;
+            return HostsInstaller.SweepLeftover(hostsPath);
+        }
+        catch (Exception exception)
+        {
+            return HostsInstaller.ExplainFailure(exception.Message);
+        }
     }
 
     private static string DefaultConfigPath()

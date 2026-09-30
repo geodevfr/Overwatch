@@ -154,6 +154,27 @@ public class HostsFileTests
     }
 
     [Fact]
+    public void Opening_the_app_removes_a_block_left_by_a_killed_process()
+    {
+        var directory = Directory.CreateTempSubdirectory("overwatch-hosts-sweep");
+        try
+        {
+            var path = Path.Combine(directory.FullName, "hosts");
+            File.WriteAllText(path, "127.0.0.1 localhost\n" + HostsFileManager.BeginMarker + "\n127.0.0.1 jeu.exemple.invalid\n" + HostsFileManager.EndMarker + "\n");
+
+            Assert.Null(HostsInstaller.SweepLeftover(path));
+            var text = File.ReadAllText(path);
+            Assert.DoesNotContain(HostsFileManager.BeginMarker, text, StringComparison.Ordinal);
+            Assert.Contains("127.0.0.1 localhost", text, StringComparison.Ordinal);
+            Assert.Null(HostsInstaller.SweepLeftover(path));
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
     public void Missing_rights_do_not_throw_out_of_the_installer()
     {
         var directory = Directory.CreateTempSubdirectory("overwatch-hosts-degraded");

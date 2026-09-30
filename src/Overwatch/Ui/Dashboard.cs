@@ -29,6 +29,14 @@ public sealed class Dashboard : IAsyncDisposable
 
     public string ConfigPath => _configPath;
 
+    public void NoteHostsWarning(string? warning)
+    {
+        if (string.IsNullOrWhiteSpace(warning))
+            return;
+        lock (_gate)
+            _hostsWarning = warning;
+    }
+
     public bool IsRunning
     {
         get

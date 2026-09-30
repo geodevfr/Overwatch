@@ -107,7 +107,7 @@ L'attribut lecture seule est retiré le temps de l'écriture, puis remis. Les AC
 
 Sans droit d'écriture, le processus ne s'arrête pas : le relais démarre, le fichier hosts reste tel quel, et l'écran affiche que le jeu ne passera pas par Overwatch. Aucune capture du jeu n'est alors possible.
 
-Le retrait a lieu sur Ctrl+C, SIGTERM et à la sortie du processus. Un arrêt brutal laisse le bloc : au démarrage suivant il est retiré ou remplacé, même sans marqueur de fin. La tâche `OverwatchHostsCleanup`, créée avec `--install-cleanup-task` ou le bouton de l'écran, fait ce retrait à l'ouverture de session. Elle ne réécrit pas la redirection : au démarrage de Windows, personne n'écoute encore, et le jeu ne doit pas être renvoyé vers cet ordinateur. On peut aussi retirer le bloc à la main :
+Le retrait a lieu sur Ctrl+C, SIGTERM et à la sortie du processus. Un arrêt brutal laisse le bloc : à l'ouverture suivante de l'écran, il est retiré avant que le relais n'écoute, même sans marqueur de fin. La tâche `OverwatchHostsCleanup`, créée avec `--install-cleanup-task` ou le bouton de l'écran, fait ce retrait à l'ouverture de session. Elle ne réécrit pas la redirection : au démarrage de Windows, personne n'écoute encore, et le jeu ne doit pas être renvoyé vers cet ordinateur. On peut aussi retirer le bloc à la main :
 
 ```bash
 dotnet run --project src/Overwatch -- --remove-hosts
