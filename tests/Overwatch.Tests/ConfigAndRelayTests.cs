@@ -21,11 +21,17 @@ public class ConfigAndRelayTests
     }
 
     [Fact]
-    public void Sample_rules_compile()
+    public void Shipped_detection_table_keeps_every_client_version_unknown()
     {
-        var rules = RuleCompiler.Compile(RuleLoader.LoadFile(RepoFile("src/Overwatch/rules.yaml")));
-        Assert.Contains(rules.Rules, rule => rule.Id == "market_tick");
-        Assert.Contains(rules.Rules, rule => rule.Id == "session_hello");
+        var file = RuleLoader.LoadFile(RepoFile("src/Overwatch/rules.yaml"));
+        var rules = RuleCompiler.Compile(file);
+
+        Assert.Equal("dofus3", file.Client);
+        Assert.Empty(file.Rules);
+        Assert.Equal(new[] { "3.6.8.8", "3.6.9.9", "3.6.11.13" }, rules.UnknownVersions);
+        Assert.Empty(rules.CapturedVersions);
+        Assert.Empty(rules.Rules);
+        Assert.All(file.Detection, entry => Assert.Empty(entry.Rules));
     }
 
     [Fact]

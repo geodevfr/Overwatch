@@ -101,6 +101,9 @@ public sealed class CompiledRule
 {
     public required string Id { get; init; }
 
+    /// <summary>Version de client lue dans la table de détection, ou vide pour un protocole d'essai.</summary>
+    public string ClientVersion { get; set; } = "";
+
     public ObservationKind Kind { get; init; } = ObservationKind.Trace;
 
     public RepeatSpec? Repeat { get; init; }

@@ -3,7 +3,8 @@ using System.Buffers.Binary;
 namespace Overwatch.Sample;
 
 /// <summary>
-/// Protocole fictif utilisé par l'auto-test et documenté dans rules.yaml.
+/// Protocole fictif de l'auto-test. Il n'a aucun lien avec Dofus 3 :
+/// les signatures du client réel vivent uniquement dans la table de détection.
 /// </summary>
 public static class FictionalProtocol
 {

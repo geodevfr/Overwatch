@@ -1,96 +1,52 @@
-# Protocole fictif, fourni pour apprendre le découpage.
-# Aucun opcode réel de jeu n'est inclus : remplacez ces motifs par vos observations.
+# Table de détection — Dofus 3 (remake Unity, Ankama).
 #
-# Trame "GD" (longueur variable) :
-#   0..1   magic 47 44
-#   2..3   longueur totale uint16 little-endian (en-tête inclus, bias 0)
-#   4      opcode uint8
-#   5..6   seq uint16 little-endian
-#   7..10  item_id uint32 little-endian
-#   11..14 price uint32 little-endian
+# Le protocole est régénéré à chaque mise à jour : les codes de messages ET
+# les numéros de champs changent. Aucune de ces valeurs n'est dans le code.
+# Overwatch ne les devine pas.
 #
-# La première règle qui reconnaît le préfixe ET dont le contexte est satisfait gagne.
-# Une règle dont le préfixe correspond mais dont le contexte échoue est consommée
-# sans être enregistrée, pour rester aligné sur les frontières de messages.
+# Chaque version reste status: unknown tant qu'une capture locale n'a pas
+# confirmé ses signatures. Une signature écrite sous une version unknown
+# est ignorée, même si enabled vaut true. Pour l'activer :
+#   1. coller les préfixes et les offsets observés dans rules, pour CETTE version
+#   2. passer status à captured
+# Le fichier est relu à chaud. Une erreur de syntaxe conserve la table précédente.
+#
+# pending nomme ce qu'une capture devra remplir. Ce ne sont pas des opcodes.
 
 version: 1
-rules:
-  - id: session_hello
-    description: Poignée de main fictive. Pose le drapeau "session".
-    direction: c2s
-    min_length: 8
-    max_length: 8
-    header_hex: "4849"
-    context:
-      sets: [session]
-    extract:
-      - name: proto
-        offset: 2
-        type: uint16
-      - name: seq
-        offset: 4
-        type: uint16
-      - name: opcode
-        offset: 6
-        type: uint8
+client: dofus3
+detection:
+  - version: "3.6.8.8"
+    status: unknown
+    pending:
+      - average_prices
+      - sale_lots
+      - server_name
+      - character_name
+      - position
+      - combat
+    rules: []
 
-  - id: market_tick
-    description: Cote fictive, uniquement après session_hello sur la même connexion.
-    direction: s2c
-    min_length: 15
-    max_length: 4096
-    header_hex: "4744"
-    length_field:
-      offset: 2
-      size: 2
-      endian: little
-      bias: 0
-    context:
-      requires: [session]
-    extract:
-      - name: opcode
-        offset: 4
-        type: uint8
-      - name: seq
-        offset: 5
-        type: uint16
-      - name: item_id
-        offset: 7
-        type: uint32
-      - name: price
-        offset: 11
-        type: uint32
+  - version: "3.6.9.9"
+    status: unknown
+    pending:
+      - average_prices
+      - sale_lots
+      - server_name
+      - character_name
+      - position
+      - combat
+    rules: []
 
-  # Les signatures réelles changent à chaque régénération du protocole.
-  # Tant que header_hex n'est pas confirmé par vos propres captures, la règle
-  # reste désactivée : une valeur fausse est pire qu'une valeur absente.
-  - id: hdv_moyennes
-    enabled: false
-    description: Prix moyens reçus en vrac à la connexion. À remplir après observation.
-    kind: average_prices
-    direction: s2c
-    min_length: 6
-    max_length: 1048576
-    header_hex: ""
-    name_field: ""
-    item_field: item_id
-    value_field: average
+  - version: "3.6.11.13"
+    status: unknown
+    pending:
+      - average_prices
+      - sale_lots
+      - server_name
+      - character_name
+      - position
+      - combat
+    rules: []
 
-  - id: hdv_lots
-    enabled: false
-    description: Lots consultés. Ignorer un total à 0. Prix unitaire seulement si la division tombe juste.
-    kind: sale_lots
-    direction: s2c
-    min_length: 8
-    max_length: 256
-    header_hex: ""
-    item_field: item_id
-    lots:
-      - quantity: 1
-        total_field: total_1
-      - quantity: 10
-        total_field: total_10
-      - quantity: 100
-        total_field: total_100
-      - quantity: 1000
-        total_field: total_1000
+rules: []

@@ -21,21 +21,35 @@ public static class RuleLoader
     public static RuleFile Parse(string yaml)
     {
         var file = Deserializer.Deserialize<RuleFile>(yaml) ?? new RuleFile();
+        file.Client ??= "";
         file.Rules ??= new List<RuleDefinition>();
+        file.Detection ??= new List<DetectionEntry>();
         foreach (var rule in file.Rules)
+            Normalize(rule);
+        foreach (var entry in file.Detection)
         {
-            rule.Extract ??= new List<FieldDefinition>();
-            rule.Lots ??= new List<SaleLotDefinition>();
-            if (rule.Repeat is not null)
-                rule.Repeat.Fields ??= new List<FieldDefinition>();
-            if (rule.Context is not null)
-            {
-                rule.Context.Requires ??= new List<string>();
-                rule.Context.Forbids ??= new List<string>();
-                rule.Context.Sets ??= new List<string>();
-            }
+            entry.Version ??= "";
+            entry.Status ??= "unknown";
+            entry.Pending ??= new List<string>();
+            entry.Rules ??= new List<RuleDefinition>();
+            foreach (var rule in entry.Rules)
+                Normalize(rule);
         }
 
         return file;
+    }
+
+    private static void Normalize(RuleDefinition rule)
+    {
+        rule.Extract ??= new List<FieldDefinition>();
+        rule.Lots ??= new List<SaleLotDefinition>();
+        if (rule.Repeat is not null)
+            rule.Repeat.Fields ??= new List<FieldDefinition>();
+        if (rule.Context is not null)
+        {
+            rule.Context.Requires ??= new List<string>();
+            rule.Context.Forbids ??= new List<string>();
+            rule.Context.Sets ??= new List<string>();
+        }
     }
 }

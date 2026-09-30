@@ -7,28 +7,95 @@ public static class RuleCompiler
 {
     public static RuleSet Compile(RuleFile file)
     {
-        var compiled = new List<CompiledRule>(file.Rules.Count);
-        var disabled = new List<string>();
-        var ids = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var definition in file.Rules)
+        var client = file.Client.Trim();
+        if (client.Length > 0 && !IsIdentifier(client))
+            throw new ConfigException($"Nom de client invalide : '{file.Client}'.");
+        if (client.Length > 0 && file.Rules.Count > 0)
         {
-            var id = definition.Id.Trim();
-            if (!IsIdentifier(id))
-                throw new ConfigException($"Identifiant de règle invalide : '{definition.Id}'.");
-            if (!ids.Add(id))
-                throw new ConfigException($"Identifiant de règle en double : {id}.");
-            if (!definition.Enabled)
+            throw new ConfigException(
+                "Les signatures d'un client nommé passent par la table detection. Le bloc rules est réservé au protocole fictif d'auto-test.");
+        }
+
+        var compiled = new List<CompiledRule>();
+        var disabled = new List<string>();
+        var withheld = new List<string>();
+        var unknown = new List<string>();
+        var captured = new List<string>();
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        var versions = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var definition in file.Rules)
+            Accept(definition, clientVersion: null);
+
+        foreach (var entry in file.Detection)
+        {
+            var version = entry.Version.Trim();
+            if (!IsVersionLabel(version))
+                throw new ConfigException($"Version de détection invalide : '{entry.Version}'.");
+            if (!versions.Add(version))
+                throw new ConfigException($"Version de détection en double : {version}.");
+
+            foreach (var pending in entry.Pending)
             {
-                disabled.Add(id);
+                if (!IsPendingKind(pending))
+                    throw new ConfigException($"Observation en attente inconnue pour {version} : '{pending}'.");
+            }
+
+            var status = entry.Status.Trim().ToLowerInvariant();
+            if (status is "unknown")
+            {
+                unknown.Add(version);
+                foreach (var definition in entry.Rules)
+                    withheld.Add(version + ":" + definition.Id.Trim());
                 continue;
             }
 
-            compiled.Add(CompileRule(definition, id));
+            if (status is not "captured")
+            {
+                throw new ConfigException(
+                    $"Statut de détection inconnu pour {version} : '{entry.Status}'. Utilisez unknown ou captured.");
+            }
+
+            captured.Add(version);
+            foreach (var definition in entry.Rules)
+                Accept(definition, version);
+        }
+
+        if (unknown.Count > 0)
+        {
+            ConsoleLog.Info(
+                "Versions inconnues jusqu'à capture : " + string.Join(", ", unknown)
+                + ". Aucune signature de ces versions n'est active.");
+        }
+
+        if (withheld.Count > 0)
+        {
+            ConsoleLog.Info(
+                "Signatures ignorées, version non capturée : " + string.Join(", ", withheld));
         }
 
         if (disabled.Count > 0)
             ConsoleLog.Info("Règles désactivées, en attente d'une signature confirmée : " + string.Join(", ", disabled));
-        return new RuleSet(compiled, disabled);
+        return new RuleSet(compiled, disabled, unknown, captured, withheld);
+
+        void Accept(RuleDefinition definition, string? clientVersion)
+        {
+            var id = definition.Id.Trim();
+            if (!IsIdentifier(id))
+                throw new ConfigException($"Identifiant de règle invalide : '{definition.Id}'.");
+            var storedId = clientVersion is null ? id : clientVersion + ":" + id;
+            if (!ids.Add(storedId))
+                throw new ConfigException($"Identifiant de règle en double : {storedId}.");
+            if (!definition.Enabled || string.IsNullOrWhiteSpace(definition.HeaderHex))
+            {
+                disabled.Add(storedId);
+                return;
+            }
+
+            var rule = CompileRule(definition, storedId);
+            rule.ClientVersion = clientVersion ?? "";
+            compiled.Add(rule);
+        }
     }
 
     private static CompiledRule CompileRule(RuleDefinition definition, string id)
@@ -370,6 +437,37 @@ public static class RuleCompiler
         }
 
         return bytes;
+    }
+
+    private static bool IsVersionLabel(string value)
+    {
+        if (value.Length is < 3 or > 32 || value[0] == '.' || value[^1] == '.')
+            return false;
+        var dotted = false;
+        var digits = 0;
+        foreach (var character in value)
+        {
+            if (character == '.')
+            {
+                if (digits == 0)
+                    return false;
+                dotted = true;
+                digits = 0;
+                continue;
+            }
+
+            if (character is < '0' or > '9')
+                return false;
+            digits++;
+        }
+
+        return dotted && digits > 0;
+    }
+
+    private static bool IsPendingKind(string value)
+    {
+        return value.Trim().ToLowerInvariant() is
+            "average_prices" or "sale_lots" or "server_name" or "character_name" or "position" or "combat";
     }
 
     private static bool IsIdentifier(string value)

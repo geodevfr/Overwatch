@@ -2,15 +2,30 @@ namespace Overwatch.Decode;
 
 public sealed class RuleSet
 {
-    public RuleSet(IReadOnlyList<CompiledRule> rules, IReadOnlyList<string>? disabled = null)
+    public RuleSet(
+        IReadOnlyList<CompiledRule> rules,
+        IReadOnlyList<string>? disabled = null,
+        IReadOnlyList<string>? unknownVersions = null,
+        IReadOnlyList<string>? capturedVersions = null,
+        IReadOnlyList<string>? withheld = null)
     {
         Rules = rules;
         Disabled = disabled ?? Array.Empty<string>();
+        UnknownVersions = unknownVersions ?? Array.Empty<string>();
+        CapturedVersions = capturedVersions ?? Array.Empty<string>();
+        Withheld = withheld ?? Array.Empty<string>();
     }
 
     public IReadOnlyList<CompiledRule> Rules { get; }
 
     public IReadOnlyList<string> Disabled { get; }
+
+    public IReadOnlyList<string> UnknownVersions { get; }
+
+    public IReadOnlyList<string> CapturedVersions { get; }
+
+    /// <summary>Signatures présentes dans le fichier mais non activées, parce que la version n'est pas capturée.</summary>
+    public IReadOnlyList<string> Withheld { get; }
 
     public MatchOutcome Match(ReadOnlySpan<byte> window, Direction direction, ConversationState conversation)
     {

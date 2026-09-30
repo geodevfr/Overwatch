@@ -31,7 +31,9 @@ Les ports `5555` et `443` sont tous les deux prévus : si un réseau bloque l'un
 
 ## Prix et clients
 
-Les signatures (taille, préfixe, contexte, champs) vivent dans `rules.yaml`. Le code ne contient pas de numéro de message. Une règle dont la signature n'est pas confirmée reste `enabled: false`. Si deux règles actives reconnaissent les mêmes octets, ou si un tableau de prix ne tombe pas juste dans la trame, rien n'est enregistré.
+Le client visé est Dofus 3. Les versions de protocole `3.6.8.8`, `3.6.9.9` et `3.6.11.13` sont listées dans la table de détection de `rules.yaml` avec le statut `unknown`. Le protocole est régénéré à chaque mise à jour (codes de messages et numéros de champs). Le code n'en contient aucun : une signature n'est active que si elle est écrite dans cette table et que sa version est passée à `captured` après une capture. Une signature déposée sous une version encore `unknown` est ignorée.
+
+Si deux règles actives reconnaissent les mêmes octets, ou si un tableau de prix ne tombe pas juste dans la trame, rien n'est enregistré.
 
 Les prix sont rangés par serveur. `Hell Mina` et `hellmina` désignent le même serveur. Un lot dont le total vaut 0 est ignoré, pour ne pas remplacer un prix déjà vu. Le prix unitaire n'est calculé que lorsque le total est divisible par la quantité.
 
@@ -68,11 +70,17 @@ Ctrl+C arrête le relay et retire le bloc hosts s'il a été installé. Si l'adr
 
 Si le protocole passe par TLS, les règles ne voient que des enregistrements opaques. Overwatch ne termine pas TLS.
 
-## Règles YAML
+## Table de détection
 
-`rules.yaml` est relu automatiquement. Une erreur de syntaxe laisse l'ensemble précédent en place. La première règle dont le préfixe correspond, dont la longueur est valide et dont le contexte est satisfait est retenue. Si le préfixe correspond mais que le contexte échoue, la trame est consommée sans être enregistrée, afin de rester aligné. Sinon le décodeur avance d'un octet.
+`rules.yaml` est la table de détection. Il est relu automatiquement. Une erreur de syntaxe laisse l'ensemble précédent en place.
 
-Les règles livrées décrivent un protocole **fictif** (`HI` / `GD`). Remplacez-les par vos propres observations. Champs : `uint8`, `uint16`, `int16`, `uint32`, `int32`, `hex`.
+Le fichier livré nomme le client `dofus3` et trois versions, toutes `unknown`, sans préfixe ni offset. `pending` indique seulement quelles observations une capture devra renseigner (`average_prices`, `sale_lots`, `server_name`, `character_name`, `position`, `combat`). Tant que `status` vaut `unknown`, aucune règle de cette version n'est compilée.
+
+Après une capture de **cette** version, les signatures vont dans `detection[].rules` (préfixe, longueur, champs). Puis `status: captured`. Une autre version reste inactive : ses codes et ses numéros de champs ne sont pas ceux de la précédente. Le bloc `rules:` à la racine est refusé dès que `client` est renseigné. Il ne sert qu'au protocole fictif de l'auto-test, qui n'est pas chargé comme client.
+
+La première règle dont le préfixe correspond, dont la longueur est valide et dont le contexte est satisfait est retenue. Si le préfixe correspond mais que le contexte échoue, la trame est consommée sans être enregistrée, afin de rester aligné. Sinon le décodeur avance d'un octet.
+
+Champs : `uint8`, `uint16`, `int16`, `uint32`, `int32`, `hex`, `utf8`.
 
 `length_field.bias` s'ajoute à la valeur lue pour obtenir la taille totale. `bias: 0` quand la longueur inclut déjà l'en-tête. Sans `length_field`, la trame a une taille fixe (`min_length` = `max_length`).
 

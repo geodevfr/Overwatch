@@ -1,4 +1,5 @@
 using System.Text;
+using Overwatch.Config;
 using Overwatch.Decode;
 using Overwatch.Hosts;
 using Overwatch.Market;
@@ -150,11 +151,86 @@ public class MarketTests
     }
 
     [Fact]
-    public void Disabled_rules_are_not_active_signatures()
+    public void A_guessed_signature_on_an_unknown_version_never_matches()
     {
-        var rules = RuleCompiler.Compile(RuleLoader.LoadFile(RepoFile("src/Overwatch/rules.yaml")));
-        Assert.Contains(rules.Disabled, id => id == "hdv_moyennes");
-        Assert.DoesNotContain(rules.Rules, rule => rule.Id == "hdv_moyennes");
+        const string yaml = """
+            client: dofus3
+            detection:
+              - version: "3.6.11.13"
+                status: unknown
+                rules:
+                  - id: note
+                    enabled: true
+                    direction: s2c
+                    min_length: 2
+                    max_length: 2
+                    header_hex: "AB"
+                    extract:
+                      - name: mark
+                        offset: 1
+                        type: uint8
+            """;
+
+        var rules = RuleCompiler.Compile(RuleLoader.Parse(yaml));
+        Assert.Empty(rules.Rules);
+        Assert.Contains("3.6.11.13:note", rules.Withheld);
+
+        var frames = new FrameReassembler(65_536).Push(
+            new byte[] { 0xAB, 0x01 },
+            rules,
+            Direction.ServerToClient,
+            new ConversationState(),
+            16);
+        Assert.Empty(frames);
+    }
+
+    [Fact]
+    public void A_captured_version_activates_only_its_own_table_entries()
+    {
+        var unknown = """
+            client: dofus3
+            detection:
+              - version: "3.6.9.9"
+                status: unknown
+                rules: []
+              - version: "3.6.11.13"
+                status: captured
+                rules:
+                  - id: note
+                    direction: s2c
+                    min_length: 2
+                    max_length: 2
+                    header_hex: "CD"
+                    extract:
+                      - name: mark
+                        offset: 1
+                        type: uint8
+            """;
+
+        var rules = RuleCompiler.Compile(RuleLoader.Parse(unknown));
+        Assert.Equal(new[] { "3.6.9.9" }, rules.UnknownVersions);
+        Assert.Equal(new[] { "3.6.11.13" }, rules.CapturedVersions);
+        var rule = Assert.Single(rules.Rules);
+        Assert.Equal("3.6.11.13:note", rule.Id);
+        Assert.Equal("3.6.11.13", rule.ClientVersion);
+    }
+
+    [Fact]
+    public void Named_client_rejects_signatures_outside_the_detection_table()
+    {
+        var yaml = """
+            client: dofus3
+            rules:
+              - id: session_hello
+                direction: c2s
+                min_length: 1
+                max_length: 1
+                header_hex: "01"
+            detection: []
+            """;
+
+        var error = Assert.Throws<ConfigException>(() => RuleCompiler.Compile(RuleLoader.Parse(yaml)));
+        Assert.Contains("table detection", error.Message, StringComparison.Ordinal);
     }
 
     [Fact]

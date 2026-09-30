@@ -4,6 +4,26 @@ public sealed class RuleFile
 {
     public int Version { get; set; } = 1;
 
+    /// <summary>
+    /// Nom du client observé. Quand il est renseigné, les signatures vivent
+    /// dans <see cref="Detection"/> et le bloc <see cref="Rules"/> reste vide.
+    /// </summary>
+    public string Client { get; set; } = "";
+
+    public List<DetectionEntry> Detection { get; set; } = new();
+
+    public List<RuleDefinition> Rules { get; set; } = new();
+}
+
+public sealed class DetectionEntry
+{
+    public string Version { get; set; } = "";
+
+    /// <summary>unknown tant qu'une capture locale n'a pas confirmé les signatures.</summary>
+    public string Status { get; set; } = "unknown";
+
+    public List<string> Pending { get; set; } = new();
+
     public List<RuleDefinition> Rules { get; set; } = new();
 }
 
