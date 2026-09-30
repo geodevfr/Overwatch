@@ -1,0 +1,8 @@
+bin/
+obj/
+TestResults/
+*.user
+*.db
+*.db-wal
+*.db-shm
+.gamediag-*.tmp

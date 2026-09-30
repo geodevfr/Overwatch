@@ -1,0 +1,62 @@
+# Protocole fictif, fourni pour apprendre le découpage.
+# Aucun opcode réel de jeu n'est inclus : remplacez ces motifs par vos observations.
+#
+# Trame "GD" (longueur variable) :
+#   0..1   magic 47 44
+#   2..3   longueur totale uint16 little-endian (en-tête inclus, bias 0)
+#   4      opcode uint8
+#   5..6   seq uint16 little-endian
+#   7..10  item_id uint32 little-endian
+#   11..14 price uint32 little-endian
+#
+# La première règle qui reconnaît le préfixe ET dont le contexte est satisfait gagne.
+# Une règle dont le préfixe correspond mais dont le contexte échoue est consommée
+# sans être enregistrée, pour rester aligné sur les frontières de messages.
+
+version: 1
+rules:
+  - id: session_hello
+    description: Poignée de main fictive. Pose le drapeau "session".
+    direction: c2s
+    min_length: 8
+    max_length: 8
+    header_hex: "4849"
+    context:
+      sets: [session]
+    extract:
+      - name: proto
+        offset: 2
+        type: uint16
+      - name: seq
+        offset: 4
+        type: uint16
+      - name: opcode
+        offset: 6
+        type: uint8
+
+  - id: market_tick
+    description: Cote fictive, uniquement après session_hello sur la même connexion.
+    direction: s2c
+    min_length: 15
+    max_length: 4096
+    header_hex: "4744"
+    length_field:
+      offset: 2
+      size: 2
+      endian: little
+      bias: 0
+    context:
+      requires: [session]
+    extract:
+      - name: opcode
+        offset: 4
+        type: uint8
+      - name: seq
+        offset: 5
+        type: uint16
+      - name: item_id
+        offset: 7
+        type: uint32
+      - name: price
+        offset: 11
+        type: uint32

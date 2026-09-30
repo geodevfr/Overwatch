@@ -1,0 +1,42 @@
+# GameDiag observe le trafic TCP de CETTE machine. Il ne le modifie pas.
+# Remplacez l'adresse upstream par l'IP réelle du serveur (pas un nom DNS :
+# un nom résolu via le fichier hosts rebouclerait vers le proxy).
+# Mettez accept_terms à true pour confirmer que vous analysez votre propre trafic.
+
+accept_terms: false
+listen_address: 127.0.0.1
+
+listeners:
+  - name: jeu-principal
+    listen_port: 5555
+    upstream_host: 203.0.113.10
+    upstream_port: 5555
+  # Passe-plat brut. Si le port 443 ne peut pas être lié, il est ignoré et 5555 continue.
+  # Aucun déchiffrement : TLS reste opaque pour les règles.
+  - name: jeu-tls
+    listen_port: 443
+    upstream_host: 203.0.113.10
+    upstream_port: 443
+
+hosts:
+  enabled: false
+  # path: /etc/hosts
+  entries:
+    - hostname: jeu.exemple.invalid
+      address: 127.0.0.1
+
+decode:
+  queue_capacity: 4096
+  max_buffer_bytes: 1048576
+  max_payload_stored: 4096
+
+sqlite:
+  path: gamediag.db
+  flush_interval_ms: 500
+  flush_batch_size: 200
+
+watchdog:
+  latency_warn_ms: 50
+  report_interval_ms: 5000
+
+rules_path: rules.yaml
