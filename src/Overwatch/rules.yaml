@@ -49,4 +49,15 @@ detection:
       - combat
     rules: []
 
+  - version: "3.6.12.16"
+    status: unknown
+    pending:
+      - average_prices
+      - sale_lots
+      - server_name
+      - character_name
+      - position
+      - combat
+    rules: []
+
 rules: []

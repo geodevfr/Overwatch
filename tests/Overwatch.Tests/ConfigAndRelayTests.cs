@@ -28,7 +28,7 @@ public class ConfigAndRelayTests
 
         Assert.Equal("dofus3", file.Client);
         Assert.Empty(file.Rules);
-        Assert.Equal(new[] { "3.6.8.8", "3.6.9.9", "3.6.11.13" }, rules.UnknownVersions);
+        Assert.Equal(new[] { "3.6.8.8", "3.6.9.9", "3.6.11.13", "3.6.12.16" }, rules.UnknownVersions);
         Assert.Empty(rules.CapturedVersions);
         Assert.Empty(rules.Rules);
         Assert.All(file.Detection, entry => Assert.Empty(entry.Rules));

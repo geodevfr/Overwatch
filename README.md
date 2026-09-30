@@ -31,7 +31,7 @@ Les ports `5555` et `443` sont tous les deux prévus : si un réseau bloque l'un
 
 ## Prix et clients
 
-Le client visé est Dofus 3. Les versions de protocole `3.6.8.8`, `3.6.9.9` et `3.6.11.13` sont listées dans la table de détection de `rules.yaml` avec le statut `unknown`. Le protocole est régénéré à chaque mise à jour (codes de messages et numéros de champs). Le code n'en contient aucun : une signature n'est active que si elle est écrite dans cette table et que sa version est passée à `captured` après une capture. Une signature déposée sous une version encore `unknown` est ignorée.
+Le client visé est Dofus 3. Les versions de protocole `3.6.8.8`, `3.6.9.9`, `3.6.11.13` et `3.6.12.16` sont listées dans la table de détection de `rules.yaml` avec le statut `unknown`. Le protocole est régénéré à chaque mise à jour (codes de messages et numéros de champs). Le code n'en contient aucun : une signature n'est active que si elle est écrite dans cette table et que sa version est passée à `captured` après une capture. Une signature déposée sous une version encore `unknown` est ignorée.
 
 Si deux règles actives reconnaissent les mêmes octets, ou si un tableau de prix ne tombe pas juste dans la trame, rien n'est enregistré.
 
