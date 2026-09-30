@@ -16,6 +16,7 @@ public static class Program
         Les octets sont relaiés sans modification, sans injection et sans attendre le décodeur.
         Aucun déchiffrement TLS. Aucune action dans le jeu. Aucun envoi vers un tiers.
         L'usage d'un outil tiers peut être contraire aux conditions du jeu : c'est à vous de l'assumer.
+        Overwatch ne lit pas le programme, ne le modifie pas, et n'essaie pas d'échapper à un contrôle.
         """;
 
     public static async Task<int> Main(string[] args)

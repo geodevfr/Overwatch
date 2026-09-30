@@ -2,6 +2,10 @@ using System.Diagnostics;
 
 namespace Overwatch.Market;
 
+/// <summary>
+/// Titres déjà publiés par le gestionnaire de fenêtres. Désactivé par défaut.
+/// N'ouvre aucun processus et ne lit aucune mémoire de programme.
+/// </summary>
 public static class WindowTitleReader
 {
     public static IReadOnlyList<string> Read()

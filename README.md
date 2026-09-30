@@ -7,7 +7,7 @@ Observateur TCP local, en lecture seule, pour comprendre un protocole binaire. L
 - **Lecture seule.** Chaque lecture est écrite telle quelle sur l'autre socket. Aucun octet n'est ajouté, retiré, réordonné ou réécrit. Le code ne contient pas de chemin d'injection.
 - **Pas d'automatisation.** Pas de clic, pas de déplacement, pas de boucle de jeu. C'est un observateur.
 - **Usage local.** L'écoute est refusée en dehors de `127.0.0.1` / `::1`. Le fichier hosts, s'il est modifié, ne l'est que sur cette machine, avec votre accord (`accept_terms: true` et `hosts.enabled: true`).
-- **Conditions du jeu.** Un outil tiers peut être interdit par les conditions d'utilisation. Overwatch ne contourne pas d'anti-triche, ne lit pas la mémoire du client, et ne modifie pas le client. La décision de l'utiliser vous appartient.
+- **Conditions du jeu.** Un outil tiers peut être interdit par les conditions d'utilisation, même s'il est passif. Une sanction reste possible. Overwatch ne lit pas la mémoire du client, ne le modifie pas, n'injecte rien, et n'essaiera pas d'échapper à un contrôle ajouté plus tard. L'usage reste le vôtre.
 - **Pas de diffusion.** SQLite reste un fichier local. Rien n'est envoyé à un serveur tiers.
 - **TLS opaque.** Un listener sur le port 443, si vous l'activez, recopie les octets. Il n'y a pas de certificat, pas de `SslStream`, pas de déchiffrement.
 
