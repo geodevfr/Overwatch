@@ -5,4 +5,4 @@ TestResults/
 *.db
 *.db-wal
 *.db-shm
-.gamediag-*.tmp
+.overwatch-*.tmp

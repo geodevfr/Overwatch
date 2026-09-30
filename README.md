@@ -1,4 +1,4 @@
-# GameDiag
+# Overwatch
 
 Observateur TCP local, en lecture seule, pour comprendre un protocole binaire. Le programme écoute sur la machine (`127.0.0.1`), relaie chaque octet vers le serveur réel, et journalise ce qu'il reconnaît. Il ne joue pas, n'injecte rien, et ne déchiffre pas TLS.
 
@@ -7,7 +7,7 @@ Observateur TCP local, en lecture seule, pour comprendre un protocole binaire. L
 - **Lecture seule.** Chaque lecture est écrite telle quelle sur l'autre socket. Aucun octet n'est ajouté, retiré, réordonné ou réécrit. Le code ne contient pas de chemin d'injection.
 - **Pas d'automatisation.** Pas de clic, pas de déplacement, pas de boucle de jeu. C'est un observateur.
 - **Usage local.** L'écoute est refusée en dehors de `127.0.0.1` / `::1`. Le fichier hosts, s'il est modifié, ne l'est que sur cette machine, avec votre accord (`accept_terms: true` et `hosts.enabled: true`).
-- **Conditions du jeu.** Un outil tiers peut être interdit par les conditions d'utilisation. GameDiag ne contourne pas d'anti-triche, ne lit pas la mémoire du client, et ne modifie pas le client. La décision de l'utiliser vous appartient.
+- **Conditions du jeu.** Un outil tiers peut être interdit par les conditions d'utilisation. Overwatch ne contourne pas d'anti-triche, ne lit pas la mémoire du client, et ne modifie pas le client. La décision de l'utiliser vous appartient.
 - **Pas de diffusion.** SQLite reste un fichier local. Rien n'est envoyé à un serveur tiers.
 - **TLS opaque.** Un listener sur le port 443, si vous l'activez, recopie les octets. Il n'y a pas de certificat, pas de `SslStream`, pas de déchiffrement.
 
@@ -40,7 +40,7 @@ Chaque connexion garde son propre état (personnage, position, combat). Un même
 Au démarrage de session, un rappel peut retirer un bloc hosts oublié après un plantage :
 
 ```bash
-dotnet run --project src/GameDiag -- --install-cleanup-task
+dotnet run --project src/Overwatch -- --install-cleanup-task
 ```
 
 ## Lancer
@@ -49,24 +49,24 @@ dotnet run --project src/GameDiag -- --install-cleanup-task
 
 ```bash
 dotnet test
-dotnet run --project src/GameDiag -- --self-test
+dotnet run --project src/Overwatch -- --self-test
 ```
 
 L'auto-test vérifie le fichier hosts sur un fichier temporaire, puis un proxy vers un serveur local fictif : les octets des deux sens restent identiques, et SQLite contient les champs décodés.
 
-Pour observer un vrai flux, éditez `src/GameDiag/config.yaml` :
+Pour observer un vrai flux, éditez `src/Overwatch/config.yaml` :
 
 1. `accept_terms: true`
 2. `upstream_host` : une **adresse IP**, jamais un nom DNS (un nom résolu par le fichier hosts rebouclerait vers le proxy)
 3. les ports d'écoute. `5555` est le port applicatif. `443` est un passe-plat : s'il ne peut pas être lié, il est ignoré et `5555` continue. Rien n'est déchiffré.
 
 ```bash
-dotnet run --project src/GameDiag -- --config src/GameDiag/config.yaml
+dotnet run --project src/Overwatch -- --config src/Overwatch/config.yaml
 ```
 
 Ctrl+C arrête le relay et retire le bloc hosts s'il a été installé. Si l'adresse upstream ne répond pas, la session se ferme au bout de 10 secondes, sans qu'aucun octet ne soit écrit au client.
 
-Si le protocole passe par TLS, les règles ne voient que des enregistrements opaques. GameDiag ne termine pas TLS.
+Si le protocole passe par TLS, les règles ne voient que des enregistrements opaques. Overwatch ne termine pas TLS.
 
 ## Règles YAML
 
@@ -83,18 +83,18 @@ Le contexte (`requires`, `forbids`, `sets`) est partagé par les deux sens d'une
 Les insertions sont groupées (`flush_interval_ms`, `flush_batch_size`) sur un thread qui n'est pas celui du relay. Une file pleine abandonne l'observation au lieu de ralentir le décodeur, qui lui-même n'attend pas les sockets.
 
 ```bash
-sqlite3 gamediag.db "select observed_at, direction, rule_id, fields_json from observations order by id desc limit 20;"
+sqlite3 overwatch.db "select observed_at, direction, rule_id, fields_json from observations order by id desc limit 20;"
 ```
 
 ## Fichier hosts
 
-Désactivé par défaut (`hosts.enabled: false`). Quand il est activé, GameDiag écrit un bloc borné par `# GAMEDIAG-BEGIN` et `# GAMEDIAG-END`, sans toucher aux autres lignes. Un second lancement ne duplique pas le bloc.
+Désactivé par défaut (`hosts.enabled: false`). Quand il est activé, Overwatch écrit un bloc borné par `# OVERWATCH-BEGIN` et `# OVERWATCH-END`, sans toucher aux autres lignes. Un second lancement ne duplique pas le bloc.
 
 Le retrait a lieu sur Ctrl+C, SIGTERM et à la sortie du processus. Un `SIGKILL` ne peut pas exécuter ce retrait : au démarrage suivant, le bloc marqué est retiré ou remplacé, y compris s'il n'a pas de marqueur de fin. On peut aussi le retirer sans relancer le proxy :
 
 ```bash
-dotnet run --project src/GameDiag -- --remove-hosts
-dotnet run --project src/GameDiag -- --remove-hosts --hosts-path /etc/hosts
+dotnet run --project src/Overwatch -- --remove-hosts
+dotnet run --project src/Overwatch -- --remove-hosts --hosts-path /etc/hosts
 ```
 
 Modifier le fichier hosts du système demande les droits administrateur. Les noms d'hôte sont limités aux lettres, chiffres, `.` et `-`, pour qu'une valeur ne puisse pas ajouter une autre ligne.
