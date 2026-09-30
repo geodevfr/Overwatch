@@ -16,6 +16,7 @@ public sealed class TcpRelayProxy
 {
     private readonly AppConfig _config;
     private readonly ObservationTap _tap;
+    private readonly CaptureRecorder? _captures;
     private readonly ConcurrentDictionary<string, int> _boundPorts = new();
     private readonly ConcurrentDictionary<Task, byte> _bridges = new();
     private readonly TaskCompletionSource _listening = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -23,10 +24,11 @@ public sealed class TcpRelayProxy
     private long _bytesServerToClient;
     private int _activeConnections;
 
-    public TcpRelayProxy(AppConfig config, ObservationTap tap)
+    public TcpRelayProxy(AppConfig config, ObservationTap tap, CaptureRecorder? captures = null)
     {
         _config = config;
         _tap = tap;
+        _captures = captures;
     }
 
     public Task Listening => _listening.Task;
@@ -36,6 +38,11 @@ public sealed class TcpRelayProxy
     public long BytesServerToClient => Interlocked.Read(ref _bytesServerToClient);
 
     public int ActiveConnections => Volatile.Read(ref _activeConnections);
+
+    public IReadOnlyList<(string Name, int Port)> BoundPorts()
+    {
+        return _boundPorts.Select(pair => (pair.Key, pair.Value)).ToArray();
+    }
 
     public int GetBoundPort(string listenerName)
     {
@@ -156,6 +163,7 @@ public sealed class TcpRelayProxy
         using (client)
         {
             TcpClient? upstream = null;
+            string? connectionId = null;
             try
             {
                 SocketSetup.Configure(client.Client);
@@ -177,7 +185,7 @@ public sealed class TcpRelayProxy
                 }
 
                 SocketSetup.Configure(upstream.Client);
-                var connectionId = Guid.NewGuid().ToString("N")[..12];
+                connectionId = Guid.NewGuid().ToString("N")[..12];
                 ConsoleLog.Info($"Session {connectionId} ({spec.Name}) vers {spec.UpstreamHost}:{spec.UpstreamPort}");
 
                 using var session = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -202,6 +210,8 @@ public sealed class TcpRelayProxy
             }
             finally
             {
+                if (connectionId is not null)
+                    _captures?.End(connectionId);
                 upstream?.Dispose();
                 Interlocked.Decrement(ref _activeConnections);
             }
@@ -247,6 +257,7 @@ public sealed class TcpRelayProxy
 
                 sequence++;
                 _tap.Publish(connectionId, listenerName, direction, sequence, buffer.AsSpan(0, read));
+                _captures?.Offer(connectionId, listenerName, direction, buffer, read);
             }
         }
         catch (OperationCanceledException)

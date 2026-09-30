@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Overwatch</title>
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <header class="top">
+    <div>
+      <p class="eyebrow">Observateur local</p>
+      <h1>Overwatch</h1>
+      <p class="lede">Le jeu reste jouable. Cette page ne fait que regarder les octets qui passent déjà, sans les modifier et sans les déchiffrer.</p>
+    </div>
+    <div class="status" id="status-pill">Arrêté</div>
+  </header>
+
+  <ol class="steps">
+    <li>Confirmez que c'est votre trafic, sur cette machine.</li>
+    <li>Indiquez l'adresse IP du serveur. Un clic sur une connexion établie la remplit.</li>
+    <li>Démarrez, jouez, puis armez la capture avant d'ouvrir l'hôtel des ventes.</li>
+  </ol>
+
+  <main>
+    <section class="card" id="reglages">
+      <h2>Réglages</h2>
+      <form id="config-form">
+        <label class="check">
+          <input type="checkbox" id="accept-terms" />
+          <span>J'observe mon propre trafic, sur cet ordinateur. Overwatch ne joue pas, n'injecte rien, et n'envoie rien ailleurs.</span>
+        </label>
+
+        <div id="listeners"></div>
+
+        <fieldset>
+          <legend>Noms que le jeu cherche</legend>
+          <p class="hint">Souvent nécessaires pour que le client passe par ici. Le nom n'est pas devinable : c'est celui que le jeu demande, pas forcément celui qu'un annuaire DNS renvoie pour l'adresse IP. La redirection n'est écrite dans le fichier hosts que pendant l'observation, puis retirée.</p>
+          <label class="check">
+            <input type="checkbox" id="hosts-enabled" />
+            <span>Rediriger ces noms vers cet ordinateur pendant l'observation</span>
+          </label>
+          <div id="hosts"></div>
+          <button type="button" class="ghost" id="add-host">Ajouter un nom</button>
+          <p class="hint" id="hosts-state"></p>
+          <button type="button" class="ghost" id="remove-hosts">Retirer un bloc oublié</button>
+        </fieldset>
+
+        <label class="check">
+          <input type="checkbox" id="windows-enabled" />
+          <span>Lire les titres de fenêtres pour rapprocher un nom déjà vu dans le flux</span>
+        </label>
+
+        <div class="actions">
+          <button type="submit">Enregistrer</button>
+          <button type="button" id="start" class="primary">Démarrer l'observation</button>
+          <button type="button" id="stop" class="ghost">Arrêter</button>
+        </div>
+        <p class="error" id="form-error" hidden></p>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>En ce moment</h2>
+      <dl class="meters" id="meters">
+        <div><dt>Vers le serveur</dt><dd id="m-c2s">0 o</dd></div>
+        <div><dt>Vers le jeu</dt><dd id="m-s2c">0 o</dd></div>
+        <div><dt>Sessions</dt><dd id="m-sessions">0</dd></div>
+        <div><dt>Messages reconnus</dt><dd id="m-messages">0</dd></div>
+      </dl>
+      <p class="hint" id="listen-line">Rien n'écoute encore.</p>
+      <ol class="log" id="log"></ol>
+    </section>
+
+    <section class="card">
+      <div class="section-head">
+        <h2>Connexions de cet ordinateur</h2>
+        <button type="button" class="ghost" id="refresh-connections">Actualiser</button>
+      </div>
+      <p class="hint">Ce sont les liaisons déjà ouvertes, jeu compris s'il est lancé. Choisissez l'adresse distante du serveur. Le port 5555 ou 443 se range dans la ligne correspondante.</p>
+      <ul id="connections" class="plain"></ul>
+    </section>
+
+    <section class="card">
+      <div class="section-head">
+        <h2>Captures</h2>
+        <button type="button" id="arm" class="primary">Armer la capture</button>
+      </div>
+      <p class="hint">La capture copie les octets après le relais. Elle n'ajoute aucun délai au jeu. Une lecture de 16&nbsp;384 octets est le plein du tampon réseau, pas un message du protocole. Les deux sens doivent contenir quelque chose. Si le début ressemble à TLS, le contenu reste illisible : Overwatch ne le déchiffre pas.</p>
+      <div id="captures"></div>
+    </section>
+
+    <section class="card">
+      <h2>Versions du client</h2>
+      <p class="hint">Aucune signature n'est active tant que la version est inconnue. On ne devine pas les codes de messages : ils changent à chaque mise à jour, et ils ne vivent que dans la table de détection.</p>
+      <div id="versions"></div>
+    </section>
+
+    <section class="card">
+      <h2>Ce qui a été reconnu</h2>
+      <p class="hint" id="journal-empty">Rien pour l'instant. C'est normal tant que la table de détection n'a pas de signature confirmée.</p>
+      <div id="journal"></div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

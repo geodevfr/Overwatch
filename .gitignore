@@ -5,4 +5,5 @@ TestResults/
 *.db
 *.db-wal
 *.db-shm
+captures/
 .overwatch-*.tmp

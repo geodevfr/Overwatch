@@ -1,9 +1,11 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Overwatch.Config;
 using Overwatch.Hosts;
 using Overwatch.Logging;
 using Overwatch.Proxy;
 using Overwatch.SelfTest;
+using Overwatch.Ui;
 
 namespace Overwatch;
 
@@ -40,6 +42,9 @@ public static class Program
             if (HasFlag(args, "--install-cleanup-task"))
                 return CleanupTasks.Install();
 
+            if (!HasFlag(args, "--relay"))
+                return await RunUiAsync(args);
+
             var configPath = ResolveConfigPath(args);
             var config = ConfigLoader.Load(configPath);
             var errors = ConfigValidator.Validate(config);
@@ -65,7 +70,7 @@ public static class Program
                 ConsoleLog.Warn("203.0.113.0/24 est un exemple documentaire. Remplacez upstream_host par l'IP réelle du serveur.");
             }
 
-            using var hosts = TryInstallHosts(config);
+            using var hosts = HostsInstaller.Attach(config);
             using var rules = Decode.RuleCatalog.FromFile(config.RulesPath);
             await using var runtime = DiagnosticRuntime.Create(config, rules);
             using var stop = new CancellationTokenSource();
@@ -143,34 +148,61 @@ public static class Program
         return 0;
     }
 
-    private static HostsSession? TryInstallHosts(AppConfig config)
+    private static async Task<int> RunUiAsync(string[] args)
     {
-        var path = string.IsNullOrWhiteSpace(config.Hosts.Path) ? HostsFileManager.DefaultPath : config.Hosts.Path;
-        var manager = new HostsFileManager(path);
-        if (!config.Hosts.Enabled)
+        Console.WriteLine(Banner);
+        var port = UiPort(args);
+        var configPath = ArgValue(args, "--config");
+        await using var server = await LocalServer.StartAsync(new LocalServerOptions
         {
-            try
-            {
-                if (manager.ContainsManagedBlock())
-                {
-                    var change = manager.Remove();
-                    ConsoleLog.Info($"Bloc hosts laissé par un arrêt brutal : {HostsSession.Describe(change)}.");
-                }
-            }
-            catch (Exception exception)
-            {
-                ConsoleLog.Warn($"Impossible de vérifier le fichier hosts ({exception.Message}).");
-            }
+            Port = port,
+            ConfigPath = string.IsNullOrWhiteSpace(configPath) ? null : Path.GetFullPath(configPath)
+        });
+        var url = server.BaseAddress.ToString().TrimEnd('/');
+        ConsoleLog.Info($"Écran local : {url}");
+        ConsoleLog.Info("Cette page reste sur cet ordinateur. Fermez cette fenêtre pour quitter.");
+        TryOpenBrowser(url);
 
-            return null;
+        using var stop = new CancellationTokenSource();
+        Console.CancelKeyPress += (_, eventArgs) =>
+        {
+            eventArgs.Cancel = true;
+            stop.Cancel();
+        };
+        using var sigint = PosixSignalRegistration.Create(PosixSignal.SIGINT, context =>
+        {
+            context.Cancel = true;
+            stop.Cancel();
+        });
+        using var sigterm = PosixSignalRegistration.Create(PosixSignal.SIGTERM, context =>
+        {
+            context.Cancel = true;
+            stop.Cancel();
+        });
+        await server.WaitAsync(stop.Token);
+        return 0;
+    }
+
+    private static void TryOpenBrowser(string url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
         }
+        catch (Exception)
+        {
+            ConsoleLog.Warn($"Ouvrez vous-même le navigateur sur {url}");
+        }
+    }
 
-        var entries = config.Hosts.Entries
-            .Select(entry => HostsFileManager.Normalize(entry.Hostname, entry.Address))
-            .ToList();
-        var installed = manager.Install(entries);
-        ConsoleLog.Info($"Fichier hosts {path} : {HostsSession.Describe(installed)}.");
-        return new HostsSession(manager);
+    private static int UiPort(string[] args)
+    {
+        var raw = ArgValue(args, "--ui-port");
+        if (string.IsNullOrWhiteSpace(raw))
+            return 47321;
+        if (!int.TryParse(raw, out var port) || port is < 0 or > 65535)
+            throw new ConfigException("--ui-port doit être un port entre 0 et 65535.");
+        return port;
     }
 
     private static async Task ReportAsync(DiagnosticRuntime runtime, TimeSpan interval, int warnMs, CancellationToken cancellationToken)

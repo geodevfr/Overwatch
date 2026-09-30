@@ -47,7 +47,7 @@ public sealed class DiagnosticRuntime : IAsyncDisposable
 
     public RuleCatalog Rules { get; }
 
-    public static DiagnosticRuntime Create(AppConfig config, RuleCatalog rules)
+    public static DiagnosticRuntime Create(AppConfig config, RuleCatalog rules, CaptureRecorder? captures = null)
     {
         var tap = new ObservationTap(config.Decode.QueueCapacity);
         var store = new SqliteSink(config.Sqlite.Path, config.Sqlite.FlushIntervalMs, config.Sqlite.FlushBatchSize);
@@ -60,7 +60,7 @@ public sealed class DiagnosticRuntime : IAsyncDisposable
             config.Decode.MaxBufferBytes,
             config.Decode.MaxPayloadStored,
             config.Decode.SliceMs);
-        var proxy = new TcpRelayProxy(config, tap);
+        var proxy = new TcpRelayProxy(config, tap, captures);
         return new DiagnosticRuntime(proxy, tap, store, decoder, watchdog, rules, config.Windows);
     }
 

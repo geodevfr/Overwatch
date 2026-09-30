@@ -49,10 +49,15 @@ dotnet run --project src/Overwatch -- --install-cleanup-task
 
 .NET 8 SDK.
 
+Double-cliquez `Lancer Overwatch.bat` (Windows). Le navigateur s'ouvre sur une page de cet ordinateur, `http://127.0.0.1:47321`. Rien à taper : la confirmation, l'adresse du serveur, le démarrage et la capture sont sur cette page.
+
 ```bash
 dotnet test
+dotnet run --project src/Overwatch
 dotnet run --project src/Overwatch -- --self-test
 ```
+
+`--relay` garde l'ancien mode sans page, pour un lancement déjà configuré.
 
 L'auto-test vérifie le fichier hosts sur un fichier temporaire, puis un proxy vers un serveur local fictif : les octets des deux sens restent identiques, et SQLite contient les champs décodés.
 

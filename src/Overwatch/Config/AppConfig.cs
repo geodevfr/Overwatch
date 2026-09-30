@@ -1,3 +1,5 @@
+using YamlDotNet.Serialization;
+
 namespace Overwatch.Config;
 
 public sealed class AppConfig
@@ -20,6 +22,7 @@ public sealed class AppConfig
 
     public string RulesPath { get; set; } = "rules.yaml";
 
+    [YamlIgnore]
     public string BaseDirectory { get; set; } = "";
 }
 
