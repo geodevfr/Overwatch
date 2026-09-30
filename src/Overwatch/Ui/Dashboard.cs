@@ -17,6 +17,7 @@ public sealed class Dashboard : IAsyncDisposable
     private CancellationTokenSource? _reportStop;
     private Task? _reportTask;
     private string? _error;
+    private string? _hostsWarning;
 
     public Dashboard(string configPath, CaptureRecorder captures)
     {
@@ -92,9 +93,12 @@ public sealed class Dashboard : IAsyncDisposable
 
         DiagnosticRuntime? runtime = null;
         HostsSession? hosts = null;
+        string? hostsWarning = null;
         try
         {
-            hosts = HostsInstaller.Attach(config);
+            var attached = HostsInstaller.Attach(config);
+            hosts = attached.Session;
+            hostsWarning = attached.Warning;
             var rules = RuleCatalog.FromFile(config.RulesPath);
             runtime = DiagnosticRuntime.Create(config, rules, Captures);
             runtime.Start();
@@ -117,6 +121,7 @@ public sealed class Dashboard : IAsyncDisposable
         {
             _runtime = runtime;
             _hosts = hosts;
+            _hostsWarning = hostsWarning;
             _reportStop = stop;
             _error = null;
             _reportTask = ReportAsync(runtime, TimeSpan.FromMilliseconds(config.Watchdog.ReportIntervalMs), config.Watchdog.LatencyWarnMs, stop.Token);
@@ -161,7 +166,16 @@ public sealed class Dashboard : IAsyncDisposable
         }
 
         await runtime.DisposeAsync();
-        hosts?.Dispose();
+        if (hosts is not null)
+        {
+            var removed = hosts.Release();
+            if (!removed.Ok)
+            {
+                lock (_gate)
+                    _hostsWarning = HostsInstaller.ExplainFailure(removed.Detail);
+            }
+        }
+
         await Captures.DrainAsync();
         ConsoleLog.Info("Observateur arrêté.");
     }
@@ -170,10 +184,12 @@ public sealed class Dashboard : IAsyncDisposable
     {
         DiagnosticRuntime? runtime;
         string? error;
+        string? hostsWarning;
         lock (_gate)
         {
             runtime = _runtime;
             error = _error;
+            hostsWarning = _hostsWarning;
         }
 
         if (runtime is null)
@@ -182,6 +198,7 @@ public sealed class Dashboard : IAsyncDisposable
             {
                 running = false,
                 error,
+                hostsWarning,
                 bytesClientToServer = 0L,
                 bytesServerToClient = 0L,
                 sessions = 0,
@@ -209,6 +226,7 @@ public sealed class Dashboard : IAsyncDisposable
         {
             running = true,
             error,
+            hostsWarning,
             bytesClientToServer = runtime.Proxy.BytesClientToServer,
             bytesServerToClient = runtime.Proxy.BytesServerToClient,
             sessions = runtime.Proxy.ActiveConnections,

@@ -40,7 +40,10 @@ public static class Program
                 return RemoveHosts(args);
 
             if (HasFlag(args, "--install-cleanup-task"))
-                return CleanupTasks.Install();
+            {
+                var task = CleanupTasks.Install();
+                return task.Ok ? 0 : 2;
+            }
 
             if (!HasFlag(args, "--relay"))
                 return await RunUiAsync(args);
@@ -70,7 +73,10 @@ public static class Program
                 ConsoleLog.Warn("203.0.113.0/24 est un exemple documentaire. Remplacez upstream_host par l'IP réelle du serveur.");
             }
 
-            using var hosts = HostsInstaller.Attach(config);
+            var attached = HostsInstaller.Attach(config);
+            using var hosts = attached.Session;
+            if (attached.Warning is not null)
+                ConsoleLog.Error(attached.Warning);
             using var rules = Decode.RuleCatalog.FromFile(config.RulesPath);
             await using var runtime = DiagnosticRuntime.Create(config, rules);
             using var stop = new CancellationTokenSource();
@@ -143,9 +149,8 @@ public static class Program
                 : HostsFileManager.DefaultPath;
         }
 
-        var change = new HostsFileManager(path).Remove();
-        ConsoleLog.Info($"{path} : {HostsSession.Describe(change)}.");
-        return 0;
+        var attempt = new HostsFileManager(path, new HostsJournal(HostsJournal.DefaultPath)).Remove();
+        return attempt.Ok ? 0 : 2;
     }
 
     private static async Task<int> RunUiAsync(string[] args)

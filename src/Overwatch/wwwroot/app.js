@@ -144,6 +144,9 @@ async function refreshStatus() {
   $("stop").disabled = !status.running;
   $("arm").textContent = status.captureArmed ? "Arrêter la capture" : "Armer la capture";
   $("arm").className = status.captureArmed ? "ghost" : "primary";
+  const banner = $("hosts-banner");
+  banner.hidden = !status.hostsWarning;
+  banner.textContent = status.hostsWarning || "";
 }
 
 async function refreshLog() {
@@ -316,6 +319,8 @@ async function refreshHosts() {
     node.textContent = `Un bloc Overwatch est présent dans ${body.path}.`;
   else
     node.textContent = `Fichier visé : ${body.path}. Aucun bloc Overwatch.`;
+  if (body.journalPath)
+    node.textContent += ` Journal : ${body.journalPath}.`;
 }
 
 $("config-form").addEventListener("submit", async (event) => {
@@ -365,6 +370,17 @@ $("remove-hosts").addEventListener("click", async () => {
   try {
     await api("/api/hosts/remove", { method: "POST", body: "{}" });
     await refreshHosts();
+    await refreshLog();
+  } catch (error) {
+    showError(error.message);
+  }
+});
+
+$("cleanup-task").addEventListener("click", async () => {
+  showError("");
+  try {
+    const body = await api("/api/hosts/cleanup-task", { method: "POST", body: "{}" });
+    $("hosts-state").textContent = body.detail || "Tâche enregistrée.";
     await refreshLog();
   } catch (error) {
     showError(error.message);

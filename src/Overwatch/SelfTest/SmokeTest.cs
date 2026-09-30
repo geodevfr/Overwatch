@@ -30,9 +30,9 @@ public static class SmokeTest
             var manager = new HostsFileManager(path);
             var entry = HostsFileManager.Normalize("jeu.exemple.invalid", "127.0.0.1");
 
-            if (manager.Install(new[] { entry }) != HostsChange.Installed)
+            if (manager.Install(new[] { entry }) is not { Ok: true, Change: HostsChange.Installed })
                 return "Le premier ajout hosts n'a pas écrit le bloc.";
-            if (manager.Install(new[] { entry }) != HostsChange.Unchanged)
+            if (manager.Install(new[] { entry }) is not { Ok: true, Change: HostsChange.Unchanged })
                 return "Le second ajout hosts n'est pas idempotent.";
 
             var text = File.ReadAllText(path);
@@ -42,7 +42,7 @@ public static class SmokeTest
                 return "Les lignes hors bloc ont été modifiées.";
 
             File.WriteAllText(path, original + HostsFileManager.BeginMarker + "\n10.1.2.3 residuel.exemple\n");
-            if (manager.Install(new[] { entry }) != HostsChange.Installed)
+            if (manager.Install(new[] { entry }) is not { Ok: true, Change: HostsChange.Installed })
                 return "La reprise après bloc tronqué a échoué.";
             var recovered = File.ReadAllText(path);
             if (recovered.Contains("residuel.exemple", StringComparison.Ordinal))
@@ -50,9 +50,9 @@ public static class SmokeTest
             if (Count(recovered, HostsFileManager.BeginMarker) != 1)
                 return "La reprise n'a pas réécrit un bloc unique.";
 
-            if (manager.Remove() != HostsChange.Removed)
+            if (manager.Remove() is not { Ok: true, Change: HostsChange.Removed })
                 return "Le retrait du bloc hosts a échoué.";
-            if (manager.Remove() != HostsChange.Unchanged)
+            if (manager.Remove() is not { Ok: true, Change: HostsChange.Unchanged })
                 return "Le second retrait hosts n'est pas idempotent.";
             if (File.ReadAllText(path) != original)
                 return "Le fichier hosts n'est pas revenu à son contenu d'origine.";

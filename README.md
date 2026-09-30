@@ -101,9 +101,13 @@ sqlite3 overwatch.db "select observed_at, direction, rule_id, fields_json from o
 
 ## Fichier hosts
 
-Désactivé par défaut (`hosts.enabled: false`). Quand il est activé, Overwatch écrit un bloc borné par `# OVERWATCH-BEGIN` et `# OVERWATCH-END`, sans toucher aux autres lignes. Un second lancement ne duplique pas le bloc.
+Désactivé par défaut (`hosts.enabled: false`). Quand il est activé, Overwatch écrit un bloc borné par `# >>> overwatch >>>` et `# <<< overwatch <<<`, sans toucher aux autres lignes. Un second lancement ne duplique pas le bloc. Un ancien bloc `# OVERWATCH-BEGIN` est repris puis remplacé.
 
-Le retrait a lieu sur Ctrl+C, SIGTERM et à la sortie du processus. Un `SIGKILL` ne peut pas exécuter ce retrait : au démarrage suivant, le bloc marqué est retiré ou remplacé, y compris s'il n'a pas de marqueur de fin. On peut aussi le retirer sans relancer le proxy :
+L'attribut lecture seule est retiré le temps de l'écriture, puis remis. Les ACL du fichier ne sont pas modifiées. Chaque résultat (succès ou échec, y compris une écriture annulée par l'antivirus ou l'accès contrôlé aux dossiers) est ajouté à `%LOCALAPPDATA%\Overwatch\hosts.log`.
+
+Sans droit d'écriture, le processus ne s'arrête pas : le relais démarre, le fichier hosts reste tel quel, et l'écran affiche que le jeu ne passera pas par Overwatch. Aucune capture du jeu n'est alors possible.
+
+Le retrait a lieu sur Ctrl+C, SIGTERM et à la sortie du processus. Un arrêt brutal laisse le bloc : au démarrage suivant il est retiré ou remplacé, même sans marqueur de fin. La tâche `OverwatchHostsCleanup`, créée avec `--install-cleanup-task` ou le bouton de l'écran, fait ce retrait à l'ouverture de session. Elle ne réécrit pas la redirection : au démarrage de Windows, personne n'écoute encore, et le jeu ne doit pas être renvoyé vers cet ordinateur. On peut aussi retirer le bloc à la main :
 
 ```bash
 dotnet run --project src/Overwatch -- --remove-hosts

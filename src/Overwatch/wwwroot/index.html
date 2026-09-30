@@ -16,6 +16,8 @@
     <div class="status" id="status-pill">Arrêté</div>
   </header>
 
+  <p class="banner" id="hosts-banner" hidden></p>
+
   <ol class="steps">
     <li>Confirmez que c'est votre trafic, sur cette machine.</li>
     <li>Indiquez l'adresse IP du serveur. Un clic sur une connexion établie la remplit.</li>
@@ -35,7 +37,7 @@
 
         <fieldset>
           <legend>Noms que le jeu cherche</legend>
-          <p class="hint">Souvent nécessaires pour que le client passe par ici. Le nom n'est pas devinable : c'est celui que le jeu demande, pas forcément celui qu'un annuaire DNS renvoie pour l'adresse IP. La redirection n'est écrite dans le fichier hosts que pendant l'observation, puis retirée.</p>
+          <p class="hint">Souvent nécessaires pour que le client passe par ici. Le nom est celui que le jeu demande. La redirection est un bloc <code># &gt;&gt;&gt; overwatch &gt;&gt;&gt;</code> écrit seulement pendant l'observation, puis retiré. Sans droits administrateur, l'observation démarre quand même et cette page le dit : le jeu ne passera pas par ici. Overwatch ne change pas les permissions du fichier hosts.</p>
           <label class="check">
             <input type="checkbox" id="hosts-enabled" />
             <span>Rediriger ces noms vers cet ordinateur pendant l'observation</span>
@@ -44,6 +46,7 @@
           <button type="button" class="ghost" id="add-host">Ajouter un nom</button>
           <p class="hint" id="hosts-state"></p>
           <button type="button" class="ghost" id="remove-hosts">Retirer un bloc oublié</button>
+          <button type="button" class="ghost" id="cleanup-task">Tâche de nettoyage au démarrage de Windows</button>
         </fieldset>
 
         <label class="check">

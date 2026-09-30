@@ -183,13 +183,23 @@ public sealed class LocalServer : IAsyncDisposable
             try
             {
                 var glance = HostsInstaller.Glance(dashboard.Load());
-                var change = new HostsFileManager(glance.Path).Remove();
-                return Results.Ok(new { change = HostsSession.Describe(change), path = glance.Path });
+                var attempt = new HostsFileManager(glance.Path, new HostsJournal(HostsJournal.DefaultPath)).Remove();
+                return attempt.Ok
+                    ? Results.Ok(new { change = HostsSession.Describe(attempt.Change), path = glance.Path })
+                    : Results.BadRequest(new { error = HostsInstaller.ExplainFailure(attempt.Detail) });
             }
             catch (Exception exception)
             {
-                return Results.BadRequest(new { error = exception.Message });
+                return Results.BadRequest(new { error = HostsInstaller.ExplainFailure(exception.Message) });
             }
+        });
+
+        app.MapPost("/api/hosts/cleanup-task", () =>
+        {
+            var attempt = CleanupTasks.Install();
+            return attempt.Ok
+                ? Results.Ok(new { detail = attempt.Detail })
+                : Results.BadRequest(new { error = attempt.Detail });
         });
     }
 

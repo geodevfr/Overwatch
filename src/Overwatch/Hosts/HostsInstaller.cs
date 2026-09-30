@@ -1,39 +1,49 @@
 using Overwatch.Config;
-using Overwatch.Logging;
 
 namespace Overwatch.Hosts;
 
 public static class HostsInstaller
 {
-    public static HostsSession? Attach(AppConfig config)
+    public static HostsAttachResult Attach(AppConfig config)
     {
         var path = string.IsNullOrWhiteSpace(config.Hosts.Path) ? HostsFileManager.DefaultPath : config.Hosts.Path;
-        var manager = new HostsFileManager(path);
+        var manager = new HostsFileManager(path, new HostsJournal(HostsJournal.DefaultPath));
         if (!config.Hosts.Enabled)
         {
-            try
-            {
-                if (manager.ContainsManagedBlock())
-                {
-                    var change = manager.Remove();
-                    ConsoleLog.Info($"Bloc hosts laissé par un arrêt brutal : {HostsSession.Describe(change)}.");
-                }
-            }
-            catch (Exception exception)
-            {
-                ConsoleLog.Warn($"Impossible de vérifier le fichier hosts ({exception.Message}).");
-            }
+            if (!manager.ContainsManagedBlock())
+                return new HostsAttachResult(null, null, false);
 
-            return null;
+            var removed = manager.Remove();
+            return removed.Ok
+                ? new HostsAttachResult(null, null, false)
+                : new HostsAttachResult(null, ExplainFailure(removed.Detail), false);
         }
 
-        var entries = config.Hosts.Entries
-            .Select(entry => HostsFileManager.Normalize(entry.Hostname, entry.Address))
-            .ToList();
-        var installed = manager.Install(entries);
-        ConsoleLog.Info($"Fichier hosts {path} : {HostsSession.Describe(installed)}.");
-        return new HostsSession(manager);
+        HostsAttempt installed;
+        try
+        {
+            var entries = config.Hosts.Entries
+                .Select(entry => HostsFileManager.Normalize(entry.Hostname, entry.Address))
+                .ToList();
+            installed = manager.Install(entries);
+        }
+        catch (Exception exception)
+        {
+            return new HostsAttachResult(null, ExplainFailure(exception.Message), false);
+        }
+
+        if (!installed.Ok)
+            return new HostsAttachResult(null, ExplainFailure(installed.Detail), false);
+
+        return new HostsAttachResult(new HostsSession(manager), null, true);
     }
+
+    public static string ExplainFailure(string detail) =>
+        "La redirection du fichier hosts a échoué (" + detail + "). "
+        + "Le relais peut tourner, mais le jeu ne passera pas par Overwatch : aucune capture du jeu n'est possible tant que ce fichier n'est pas modifié. "
+        + "Relancez le programme avec un clic droit, Exécuter en tant qu'administrateur. "
+        + "Si l'accord est déjà donné et que l'écriture échoue encore, l'accès contrôlé aux dossiers ou un antivirus bloque le fichier hosts. "
+        + "Les permissions du fichier n'ont pas été changées.";
 
     public static HostsGlance Glance(AppConfig config)
     {
@@ -41,13 +51,15 @@ public static class HostsInstaller
         try
         {
             var manager = new HostsFileManager(path);
-            return new HostsGlance(path, manager.ContainsManagedBlock(), null);
+            return new HostsGlance(path, manager.ContainsManagedBlock(), null, HostsJournal.DefaultPath);
         }
         catch (Exception exception)
         {
-            return new HostsGlance(path, false, exception.Message);
+            return new HostsGlance(path, false, exception.Message, HostsJournal.DefaultPath);
         }
     }
 }
 
-public sealed record HostsGlance(string Path, bool ManagedBlockPresent, string? Error);
+public sealed record HostsAttachResult(HostsSession? Session, string? Warning, bool Redirected);
+
+public sealed record HostsGlance(string Path, bool ManagedBlockPresent, string? Error, string? JournalPath = null);

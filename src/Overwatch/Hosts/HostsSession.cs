@@ -1,5 +1,3 @@
-using Overwatch.Logging;
-
 namespace Overwatch.Hosts;
 
 public sealed class HostsSession : IDisposable
@@ -12,22 +10,14 @@ public sealed class HostsSession : IDisposable
         _manager = manager;
     }
 
-    public void Dispose()
+    public HostsAttempt Release()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
-            return;
-
-        try
-        {
-            var change = _manager.Remove();
-            ConsoleLog.Info($"Fichier hosts nettoyé ({Describe(change)}).");
-        }
-        catch (Exception exception)
-        {
-            ConsoleLog.Error($"Nettoyage du fichier hosts impossible : {exception.Message}");
-            ConsoleLog.Error("Relancez avec les droits administrateur : overwatch --remove-hosts");
-        }
+            return HostsAttempt.Success(HostsChange.Unchanged, "Bloc hosts déjà retiré.");
+        return _manager.Remove();
     }
+
+    public void Dispose() => Release();
 
     public static string Describe(HostsChange change) => change switch
     {
