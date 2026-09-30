@@ -4,18 +4,21 @@ public readonly record struct WatchdogSnapshot(
     long Samples,
     long OverThreshold,
     TimeSpan Last,
-    TimeSpan MaxSincePreviousSnapshot);
+    TimeSpan MaxSincePreviousSnapshot,
+    string Offender);
 
 /// <summary>
 /// Mesure le temps passé dans le décodeur, hors du thread qui relaie les sockets.
 /// </summary>
 public sealed class DecoderWatchdog
 {
+    private readonly object _gate = new();
     private readonly long _thresholdTicks;
     private long _lastTicks;
     private long _maxTicks;
     private long _samples;
     private long _overThreshold;
+    private string _offender = "";
 
     public DecoderWatchdog(TimeSpan threshold)
     {
@@ -24,35 +27,37 @@ public sealed class DecoderWatchdog
         _thresholdTicks = threshold.Ticks;
     }
 
-    public void Record(TimeSpan elapsed)
+    public void Record(TimeSpan elapsed, string packetId = "inconnu")
     {
         var ticks = elapsed.Ticks;
-        Interlocked.Exchange(ref _lastTicks, ticks);
-        UpdateMax(ticks);
-        Interlocked.Increment(ref _samples);
-        if (ticks > _thresholdTicks)
-            Interlocked.Increment(ref _overThreshold);
+        lock (_gate)
+        {
+            _samples++;
+            _lastTicks = ticks;
+            if (ticks > _thresholdTicks)
+                _overThreshold++;
+            if (ticks >= _maxTicks)
+            {
+                _maxTicks = ticks;
+                if (ticks > _thresholdTicks)
+                    _offender = string.IsNullOrWhiteSpace(packetId) ? "inconnu" : packetId;
+            }
+        }
     }
 
     public WatchdogSnapshot SnapshotAndResetMax()
     {
-        var max = Interlocked.Exchange(ref _maxTicks, 0);
-        return new WatchdogSnapshot(
-            Interlocked.Read(ref _samples),
-            Interlocked.Read(ref _overThreshold),
-            TimeSpan.FromTicks(Interlocked.Read(ref _lastTicks)),
-            TimeSpan.FromTicks(max));
-    }
-
-    private void UpdateMax(long ticks)
-    {
-        while (true)
+        lock (_gate)
         {
-            var current = Interlocked.Read(ref _maxTicks);
-            if (ticks <= current)
-                return;
-            if (Interlocked.CompareExchange(ref _maxTicks, ticks, current) == current)
-                return;
+            var snapshot = new WatchdogSnapshot(
+                _samples,
+                _overThreshold,
+                TimeSpan.FromTicks(_lastTicks),
+                TimeSpan.FromTicks(_maxTicks),
+                _offender);
+            _maxTicks = 0;
+            _offender = "";
+            return snapshot;
         }
     }
 }

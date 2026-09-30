@@ -2,17 +2,21 @@ namespace GameDiag.Decode;
 
 public sealed class RuleSet
 {
-    public RuleSet(IReadOnlyList<CompiledRule> rules)
+    public RuleSet(IReadOnlyList<CompiledRule> rules, IReadOnlyList<string>? disabled = null)
     {
         Rules = rules;
+        Disabled = disabled ?? Array.Empty<string>();
     }
 
     public IReadOnlyList<CompiledRule> Rules { get; }
+
+    public IReadOnlyList<string> Disabled { get; }
 
     public MatchOutcome Match(ReadOnlySpan<byte> window, Direction direction, ConversationState conversation)
     {
         var needMore = false;
         int? contextSkip = null;
+        var matches = new List<(CompiledRule Rule, int Total)>();
 
         foreach (var rule in Rules)
         {
@@ -43,13 +47,26 @@ public sealed class RuleSet
                 continue;
             }
 
+            if (!rule.StructureFits(window[..total]))
+                continue;
+
             if (!conversation.Satisfies(rule))
             {
                 contextSkip ??= total;
                 continue;
             }
 
-            return MatchOutcome.Frame(rule, total);
+            matches.Add((rule, total));
+        }
+
+        if (matches.Count == 1)
+            return MatchOutcome.Frame(matches[0].Rule, matches[0].Total);
+        if (matches.Count > 1)
+        {
+            var length = matches[0].Total;
+            return matches.TrueForAll(match => match.Total == length)
+                ? MatchOutcome.Withhold(length)
+                : MatchOutcome.Resync();
         }
 
         if (contextSkip is int skipLength)

@@ -91,6 +91,7 @@ public class TapAndWorkerTests
 
         Assert.Equal(2, snapshot.Samples);
         Assert.Equal(1, snapshot.OverThreshold);
+        Assert.Equal("inconnu", snapshot.Offender);
         Assert.True(snapshot.MaxSincePreviousSnapshot >= TimeSpan.FromMilliseconds(80));
         Assert.Equal(TimeSpan.Zero, watchdog.SnapshotAndResetMax().MaxSincePreviousSnapshot);
     }

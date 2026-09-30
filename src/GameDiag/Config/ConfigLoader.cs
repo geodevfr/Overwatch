@@ -24,6 +24,7 @@ public static class ConfigLoader
         config.Decode ??= new DecodeConfig();
         config.Sqlite ??= new SqliteConfig();
         config.Watchdog ??= new WatchdogConfig();
+        config.Windows ??= new WindowsConfig();
         config.ListenAddress = string.IsNullOrWhiteSpace(config.ListenAddress)
             ? "127.0.0.1"
             : config.ListenAddress.Trim();

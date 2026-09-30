@@ -1,4 +1,5 @@
 using GameDiag.Config;
+using GameDiag.Logging;
 
 namespace GameDiag.Decode;
 
@@ -7,20 +8,31 @@ public static class RuleCompiler
     public static RuleSet Compile(RuleFile file)
     {
         var compiled = new List<CompiledRule>(file.Rules.Count);
+        var disabled = new List<string>();
         var ids = new HashSet<string>(StringComparer.Ordinal);
         foreach (var definition in file.Rules)
-            compiled.Add(CompileRule(definition, ids));
-        return new RuleSet(compiled);
+        {
+            var id = definition.Id.Trim();
+            if (!IsIdentifier(id))
+                throw new ConfigException($"Identifiant de règle invalide : '{definition.Id}'.");
+            if (!ids.Add(id))
+                throw new ConfigException($"Identifiant de règle en double : {id}.");
+            if (!definition.Enabled)
+            {
+                disabled.Add(id);
+                continue;
+            }
+
+            compiled.Add(CompileRule(definition, id));
+        }
+
+        if (disabled.Count > 0)
+            ConsoleLog.Info("Règles désactivées, en attente d'une signature confirmée : " + string.Join(", ", disabled));
+        return new RuleSet(compiled, disabled);
     }
 
-    private static CompiledRule CompileRule(RuleDefinition definition, HashSet<string> ids)
+    private static CompiledRule CompileRule(RuleDefinition definition, string id)
     {
-        var id = definition.Id.Trim();
-        if (!IsIdentifier(id))
-            throw new ConfigException($"Identifiant de règle invalide : '{definition.Id}'.");
-        if (!ids.Add(id))
-            throw new ConfigException($"Identifiant de règle en double : {id}.");
-
         if (definition.MinLength < 1)
             throw new ConfigException($"min_length de {id} doit être au moins 1.");
         if (definition.MaxLength < definition.MinLength)
@@ -79,8 +91,8 @@ public static class RuleCompiler
                 "uint8" => 1,
                 "uint16" or "int16" => 2,
                 "uint32" or "int32" => 4,
-                "hex" when field.Size > 0 => field.Size,
-                "hex" => throw new ConfigException($"Le champ hex {id}.{name} a besoin d'une size."),
+                "hex" or "utf8" when field.Size > 0 => field.Size,
+                "hex" or "utf8" => throw new ConfigException($"Le champ {type} {id}.{name} a besoin d'une size."),
                 _ => throw new ConfigException($"Type inconnu pour {id}.{name} : {field.Type}.")
             };
 
@@ -97,9 +109,20 @@ public static class RuleCompiler
             });
         }
 
+        var kind = ParseKind(definition.Kind, id);
+        var repeat = CompileRepeat(definition.Repeat, id, defaultLittle);
+        var lots = CompileLots(definition.Lots, id, fields);
+        ValidateKind(kind, id, definition, fields, repeat, lots);
+
         return new CompiledRule
         {
             Id = id,
+            Kind = kind,
+            Repeat = repeat,
+            Lots = lots,
+            NameField = definition.NameField.Trim(),
+            ItemField = string.IsNullOrWhiteSpace(definition.ItemField) ? "item_id" : definition.ItemField.Trim(),
+            ValueField = string.IsNullOrWhiteSpace(definition.ValueField) ? "average" : definition.ValueField.Trim(),
             Description = definition.Description?.Trim() ?? "",
             Direction = ParseDirection(definition.Direction, id),
             MinLength = definition.MinLength,
@@ -110,6 +133,160 @@ public static class RuleCompiler
             Forbids = NormalizeFlags(context?.Forbids, id),
             Sets = NormalizeFlags(context?.Sets, id),
             Fields = fields.ToArray()
+        };
+    }
+
+    private static void ValidateKind(
+        ObservationKind kind,
+        string id,
+        RuleDefinition definition,
+        List<FieldSpec> fields,
+        RepeatSpec? repeat,
+        SaleLotSpec[] lots)
+    {
+        switch (kind)
+        {
+            case ObservationKind.AveragePrices:
+                if (repeat is null)
+                    throw new ConfigException($"La règle {id} (prix moyens) exige un bloc repeat. Sans lui, elle est désactivée.");
+                RequireRepeatField(repeat, string.IsNullOrWhiteSpace(definition.ItemField) ? "item_id" : definition.ItemField.Trim(), id);
+                RequireRepeatField(repeat, string.IsNullOrWhiteSpace(definition.ValueField) ? "average" : definition.ValueField.Trim(), id);
+                break;
+            case ObservationKind.SaleLots:
+                if (lots.Length == 0)
+                    throw new ConfigException($"La règle {id} (lots) n'a aucun palier. Elle ne doit pas deviner les quantités.");
+                RequireField(fields, string.IsNullOrWhiteSpace(definition.ItemField) ? "item_id" : definition.ItemField.Trim(), id);
+                break;
+            case ObservationKind.ServerName:
+            case ObservationKind.CharacterName:
+                var nameField = definition.NameField.Trim();
+                if (nameField.Length == 0)
+                    throw new ConfigException($"La règle {id} exige name_field.");
+                var named = RequireField(fields, nameField, id);
+                if (named.Type != "utf8")
+                    throw new ConfigException($"Le champ {id}.{nameField} doit être utf8. Un entier ne sera pas interprété comme un nom.");
+                break;
+            case ObservationKind.Position:
+            case ObservationKind.Combat:
+                if (fields.Count == 0)
+                    throw new ConfigException($"La règle {id} n'extrait aucun champ. Rien n'est enregistré.");
+                break;
+        }
+    }
+
+    private static FieldSpec RequireField(List<FieldSpec> fields, string name, string ruleId)
+    {
+        foreach (var field in fields)
+        {
+            if (field.Name == name)
+                return field;
+        }
+
+        throw new ConfigException($"Le champ {name} est absent de la règle {ruleId}.");
+    }
+
+    private static void RequireRepeatField(RepeatSpec repeat, string name, string ruleId)
+    {
+        foreach (var field in repeat.Fields)
+        {
+            if (field.Name == name)
+                return;
+        }
+
+        throw new ConfigException($"Le champ répété {name} est absent de la règle {ruleId}.");
+    }
+
+    private static RepeatSpec? CompileRepeat(RepeatDefinition? definition, string ruleId, bool defaultLittle)
+    {
+        if (definition is null)
+            return null;
+        if (definition.CountSize is not (1 or 2 or 4))
+            throw new ConfigException($"repeat.count_size de {ruleId} doit valoir 1, 2 ou 4.");
+        if (definition.CountOffset < 0 || definition.EntryOffset < 0 || definition.EntrySize < 1)
+            throw new ConfigException($"Géométrie repeat invalide pour {ruleId}.");
+        if (definition.EntryOffset < definition.CountOffset + definition.CountSize)
+            throw new ConfigException($"Les entrées de {ruleId} chevauchent le compteur.");
+
+        var fields = new List<FieldSpec>();
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var field in definition.Fields)
+        {
+            var name = field.Name.Trim();
+            if (!IsIdentifier(name))
+                throw new ConfigException($"Champ répété invalide dans {ruleId} : '{field.Name}'.");
+            if (!names.Add(name))
+                throw new ConfigException($"Champ répété en double dans {ruleId} : {name}.");
+            var type = field.Type.Trim().ToLowerInvariant();
+            var size = type switch
+            {
+                "uint8" => 1,
+                "uint16" or "int16" => 2,
+                "uint32" or "int32" => 4,
+                "hex" or "utf8" when field.Size > 0 => field.Size,
+                _ => throw new ConfigException($"Type répété inconnu pour {ruleId}.{name} : {field.Type}.")
+            };
+            if (field.Offset < 0 || field.Offset + size > definition.EntrySize)
+                throw new ConfigException($"Le champ répété {ruleId}.{name} sort de l'entrée.");
+            var endian = string.IsNullOrWhiteSpace(field.Endian) ? defaultLittle : ParseEndian(field.Endian, $"{ruleId}.{name}");
+            fields.Add(new FieldSpec
+            {
+                Name = name,
+                Offset = field.Offset,
+                Type = type,
+                Size = size,
+                LittleEndian = endian
+            });
+        }
+
+        if (fields.Count == 0)
+            throw new ConfigException($"Le bloc repeat de {ruleId} n'a aucun champ.");
+
+        return new RepeatSpec
+        {
+            CountOffset = definition.CountOffset,
+            CountSize = definition.CountSize,
+            LittleEndian = ParseEndian(definition.Endian, ruleId),
+            EntryOffset = definition.EntryOffset,
+            EntrySize = definition.EntrySize,
+            Fields = fields.ToArray()
+        };
+    }
+
+    private static SaleLotSpec[] CompileLots(List<SaleLotDefinition> lots, string ruleId, List<FieldSpec> fields)
+    {
+        if (lots.Count == 0)
+            return Array.Empty<SaleLotSpec>();
+        var compiled = new SaleLotSpec[lots.Count];
+        var quantities = new HashSet<int>();
+        for (var index = 0; index < lots.Count; index++)
+        {
+            var lot = lots[index];
+            if (lot.Quantity <= 0)
+                throw new ConfigException($"Quantité de lot invalide dans {ruleId}.");
+            if (!quantities.Add(lot.Quantity))
+                throw new ConfigException($"Quantité de lot en double dans {ruleId} : {lot.Quantity}.");
+            var totalField = lot.TotalField.Trim();
+            if (!IsIdentifier(totalField))
+                throw new ConfigException($"total_field invalide dans {ruleId}.");
+            RequireField(fields, totalField, ruleId);
+            compiled[index] = new SaleLotSpec { Quantity = lot.Quantity, TotalField = totalField };
+        }
+
+        return compiled;
+    }
+
+    private static ObservationKind ParseKind(string value, string ruleId)
+    {
+        return value.Trim().ToLowerInvariant() switch
+        {
+            "" or "trace" => ObservationKind.Trace,
+            "average_prices" => ObservationKind.AveragePrices,
+            "sale_lots" => ObservationKind.SaleLots,
+            "server_name" => ObservationKind.ServerName,
+            "character_name" => ObservationKind.CharacterName,
+            "position" => ObservationKind.Position,
+            "combat" => ObservationKind.Combat,
+            _ => throw new ConfigException($"kind inconnu pour {ruleId} : {value}. La règle doit être désactivée plutôt que rangée au hasard.")
         };
     }
 

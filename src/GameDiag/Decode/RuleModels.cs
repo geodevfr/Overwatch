@@ -9,9 +9,13 @@ public sealed class RuleFile
 
 public sealed class RuleDefinition
 {
+    public bool Enabled { get; set; } = true;
+
     public string Id { get; set; } = "";
 
     public string Description { get; set; } = "";
+
+    public string Kind { get; set; } = "trace";
 
     public string Direction { get; set; } = "any";
 
@@ -26,6 +30,38 @@ public sealed class RuleDefinition
     public RuleContextDefinition? Context { get; set; }
 
     public List<FieldDefinition> Extract { get; set; } = new();
+
+    public RepeatDefinition? Repeat { get; set; }
+
+    public List<SaleLotDefinition> Lots { get; set; } = new();
+
+    public string NameField { get; set; } = "";
+
+    public string ItemField { get; set; } = "";
+
+    public string ValueField { get; set; } = "";
+}
+
+public sealed class RepeatDefinition
+{
+    public int CountOffset { get; set; }
+
+    public int CountSize { get; set; } = 2;
+
+    public string Endian { get; set; } = "little";
+
+    public int EntryOffset { get; set; }
+
+    public int EntrySize { get; set; }
+
+    public List<FieldDefinition> Fields { get; set; } = new();
+}
+
+public sealed class SaleLotDefinition
+{
+    public int Quantity { get; set; }
+
+    public string TotalField { get; set; } = "";
 }
 
 public sealed class LengthFieldDefinition

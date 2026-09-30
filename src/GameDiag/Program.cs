@@ -37,6 +37,9 @@ public static class Program
             if (HasFlag(args, "--remove-hosts"))
                 return RemoveHosts(args);
 
+            if (HasFlag(args, "--install-cleanup-task"))
+                return CleanupTasks.Install();
+
             var configPath = ResolveConfigPath(args);
             var config = ConfigLoader.Load(configPath);
             var errors = ConfigValidator.Validate(config);
@@ -54,6 +57,9 @@ public static class Program
             }
 
             Console.WriteLine(Banner);
+            var ports = config.Listeners.Select(listener => listener.ListenPort).ToHashSet();
+            if (!ports.Contains(5555) || !ports.Contains(443))
+                ConsoleLog.Warn("Écoutez 5555 et 443. Si un réseau bloque l'un des deux, le client bascule sur l'autre.");
             if (config.Listeners.Any(listener => listener.UpstreamHost.StartsWith("203.0.113.", StringComparison.Ordinal)))
             {
                 ConsoleLog.Warn("203.0.113.0/24 est un exemple documentaire. Remplacez upstream_host par l'IP réelle du serveur.");
@@ -185,11 +191,12 @@ public static class Program
                 $"relay c2s {FormatBytes(runtime.Proxy.BytesClientToServer)} s2c {FormatBytes(runtime.Proxy.BytesServerToClient)} | " +
                 $"sessions {runtime.Proxy.ActiveConnections} | messages {runtime.Decoder.Messages} | " +
                 $"file {runtime.Tap.PendingCount}/{runtime.Tap.Capacity} | pertes tap {runtime.Tap.DroppedChunks} | " +
-                $"écarts {runtime.Decoder.Gaps} | decode max {snapshot.MaxSincePreviousSnapshot.TotalMilliseconds:0.0} ms | " +
+                $"écarts {runtime.Decoder.Gaps} | incertains {runtime.Decoder.Withheld} | decode max {snapshot.MaxSincePreviousSnapshot.TotalMilliseconds:0.0} ms | " +
                 $"sqlite {runtime.Store.Pending} en attente, {runtime.Store.Written} écrits, {runtime.Store.Dropped} perdus");
             if (snapshot.Samples > 0 && snapshot.MaxSincePreviousSnapshot.TotalMilliseconds > warnMs)
             {
-                ConsoleLog.Warn("Le décodeur dépasse le seuil. Le relay continue ; des observations peuvent être abandonnées.");
+                var packet = string.IsNullOrEmpty(snapshot.Offender) ? "inconnu" : snapshot.Offender;
+                ConsoleLog.Warn($"Blocage décodeur {snapshot.MaxSincePreviousSnapshot.TotalMilliseconds:0} ms, paquet {packet}. Le relay continue.");
             }
         }
     }

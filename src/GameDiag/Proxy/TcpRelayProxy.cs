@@ -66,7 +66,9 @@ public sealed class TcpRelayProxy
                 catch (SocketException exception)
                 {
                     ConsoleLog.Error($"Impossible d'écouter sur {address}:{spec.ListenPort} ({exception.SocketErrorCode}).");
-                    if (spec.ListenPort < 1024)
+                    if (spec.ListenPort is 443 or 5555)
+                        ConsoleLog.Error("Le client bascule entre 5555 et 443. Sans les deux, une partie des réseaux ne passe plus par le relay.");
+                    else if (spec.ListenPort < 1024)
                         ConsoleLog.Error("Un port inférieur à 1024 demande des droits administrateur. Les autres listeners continuent.");
                     continue;
                 }

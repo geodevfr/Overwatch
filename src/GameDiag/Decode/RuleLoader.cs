@@ -25,6 +25,9 @@ public static class RuleLoader
         foreach (var rule in file.Rules)
         {
             rule.Extract ??= new List<FieldDefinition>();
+            rule.Lots ??= new List<SaleLotDefinition>();
+            if (rule.Repeat is not null)
+                rule.Repeat.Fields ??= new List<FieldDefinition>();
             if (rule.Context is not null)
             {
                 rule.Context.Requires ??= new List<string>();

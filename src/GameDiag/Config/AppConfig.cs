@@ -16,6 +16,8 @@ public sealed class AppConfig
 
     public WatchdogConfig Watchdog { get; set; } = new();
 
+    public WindowsConfig Windows { get; set; } = new();
+
     public string RulesPath { get; set; } = "rules.yaml";
 
     public string BaseDirectory { get; set; } = "";
@@ -55,6 +57,8 @@ public sealed class DecodeConfig
     public int MaxBufferBytes { get; set; } = 1_048_576;
 
     public int MaxPayloadStored { get; set; } = 4096;
+
+    public int SliceMs { get; set; } = 1;
 }
 
 public sealed class SqliteConfig
@@ -68,7 +72,14 @@ public sealed class SqliteConfig
 
 public sealed class WatchdogConfig
 {
-    public int LatencyWarnMs { get; set; } = 50;
+    public int LatencyWarnMs { get; set; } = 300;
 
     public int ReportIntervalMs { get; set; } = 5000;
+}
+
+public sealed class WindowsConfig
+{
+    public bool Enabled { get; set; }
+
+    public int PollMs { get; set; } = 1000;
 }

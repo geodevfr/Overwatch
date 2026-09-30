@@ -25,7 +25,23 @@ Le relay active `TCP_NODELAY` des deux côtés. Il écrit le tampon reçu avant 
 
 Une perte d'échantillon crée un trou de séquence. Le décodeur jette alors le morceau de trame en cours et oublie les drapeaux de conversation de cette connexion, pour ne pas recoller des octets qui ne se suivent plus.
 
-Le watchdog mesure le temps passé dans le décodeur, sur son propre thread. Un dépassement est journalisé. Il ne ralentit pas les sockets.
+Le décodeur travaille par tranches d'une milliseconde, puis rend la main. Le watchdog signale un traitement au-delà de 300 ms avec l'identifiant de la règle, ou à défaut le préfixe hexadécimal du flux. Ce signal ne ralentit pas les sockets.
+
+Les ports `5555` et `443` sont tous les deux prévus : si un réseau bloque l'un, le client bascule sur l'autre. Le port `443` reste un passe-plat. S'il s'agit de TLS, les signatures ne correspondent pas et aucune valeur n'est inventée.
+
+## Prix et clients
+
+Les signatures (taille, préfixe, contexte, champs) vivent dans `rules.yaml`. Le code ne contient pas de numéro de message. Une règle dont la signature n'est pas confirmée reste `enabled: false`. Si deux règles actives reconnaissent les mêmes octets, ou si un tableau de prix ne tombe pas juste dans la trame, rien n'est enregistré.
+
+Les prix sont rangés par serveur. `Hell Mina` et `hellmina` désignent le même serveur. Un lot dont le total vaut 0 est ignoré, pour ne pas remplacer un prix déjà vu. Le prix unitaire n'est calculé que lorsque le total est divisible par la quantité.
+
+Chaque connexion garde son propre état (personnage, position, combat). Un même prix vu par deux fenêtres n'est compté qu'une fois. Le titre de fenêtre, si `windows.enabled` est vrai, ne sert qu'à rapprocher un nom déjà lu dans le flux ; un rapprochement ambigu est laissé vide.
+
+Au démarrage de session, un rappel peut retirer un bloc hosts oublié après un plantage :
+
+```bash
+dotnet run --project src/GameDiag -- --install-cleanup-task
+```
 
 ## Lancer
 

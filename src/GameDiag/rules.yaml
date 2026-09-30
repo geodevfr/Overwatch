@@ -60,3 +60,37 @@ rules:
       - name: price
         offset: 11
         type: uint32
+
+  # Les signatures réelles changent à chaque régénération du protocole.
+  # Tant que header_hex n'est pas confirmé par vos propres captures, la règle
+  # reste désactivée : une valeur fausse est pire qu'une valeur absente.
+  - id: hdv_moyennes
+    enabled: false
+    description: Prix moyens reçus en vrac à la connexion. À remplir après observation.
+    kind: average_prices
+    direction: s2c
+    min_length: 6
+    max_length: 1048576
+    header_hex: ""
+    name_field: ""
+    item_field: item_id
+    value_field: average
+
+  - id: hdv_lots
+    enabled: false
+    description: Lots consultés. Ignorer un total à 0. Prix unitaire seulement si la division tombe juste.
+    kind: sale_lots
+    direction: s2c
+    min_length: 8
+    max_length: 256
+    header_hex: ""
+    item_field: item_id
+    lots:
+      - quantity: 1
+        total_field: total_1
+      - quantity: 10
+        total_field: total_10
+      - quantity: 100
+        total_field: total_100
+      - quantity: 1000
+        total_field: total_1000

@@ -29,6 +29,7 @@ decode:
   queue_capacity: 4096
   max_buffer_bytes: 1048576
   max_payload_stored: 4096
+  slice_ms: 1
 
 sqlite:
   path: gamediag.db
@@ -36,7 +37,11 @@ sqlite:
   flush_batch_size: 200
 
 watchdog:
-  latency_warn_ms: 50
+  latency_warn_ms: 300
   report_interval_ms: 5000
+
+windows:
+  enabled: false
+  poll_ms: 1000
 
 rules_path: rules.yaml

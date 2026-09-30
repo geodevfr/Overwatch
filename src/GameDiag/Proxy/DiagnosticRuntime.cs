@@ -1,7 +1,7 @@
 using GameDiag.Config;
 using GameDiag.Decode;
-using GameDiag.Hosts;
 using GameDiag.Logging;
+using GameDiag.Market;
 using GameDiag.Persist;
 using GameDiag.Watchdog;
 
@@ -10,9 +10,11 @@ namespace GameDiag.Proxy;
 public sealed class DiagnosticRuntime : IAsyncDisposable
 {
     private readonly CancellationTokenSource _network = new();
+    private readonly WindowsConfig _windows;
     private Task? _proxyTask;
     private Task? _decodeTask;
     private Task? _storeTask;
+    private Task? _titlesTask;
     private int _disposed;
 
     private DiagnosticRuntime(
@@ -21,7 +23,8 @@ public sealed class DiagnosticRuntime : IAsyncDisposable
         SqliteSink store,
         DecodeWorker decoder,
         DecoderWatchdog watchdog,
-        RuleCatalog rules)
+        RuleCatalog rules,
+        WindowsConfig windows)
     {
         Proxy = proxy;
         Tap = tap;
@@ -29,6 +32,7 @@ public sealed class DiagnosticRuntime : IAsyncDisposable
         Decoder = decoder;
         Watchdog = watchdog;
         Rules = rules;
+        _windows = windows;
     }
 
     public TcpRelayProxy Proxy { get; }
@@ -54,9 +58,10 @@ public sealed class DiagnosticRuntime : IAsyncDisposable
             store,
             watchdog,
             config.Decode.MaxBufferBytes,
-            config.Decode.MaxPayloadStored);
+            config.Decode.MaxPayloadStored,
+            config.Decode.SliceMs);
         var proxy = new TcpRelayProxy(config, tap);
-        return new DiagnosticRuntime(proxy, tap, store, decoder, watchdog, rules);
+        return new DiagnosticRuntime(proxy, tap, store, decoder, watchdog, rules, config.Windows);
     }
 
     public void Start()
@@ -64,6 +69,24 @@ public sealed class DiagnosticRuntime : IAsyncDisposable
         _storeTask = Store.RunAsync();
         _decodeTask = Decoder.RunAsync();
         _proxyTask = Proxy.RunAsync(_network.Token);
+        if (_windows.Enabled)
+            _titlesTask = PollTitlesAsync(_network.Token);
+    }
+
+    private async Task PollTitlesAsync(CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            Decoder.PostTitles(WindowTitleReader.Read());
+            try
+            {
+                await Task.Delay(_windows.PollMs, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+        }
     }
 
     public void RequestStop() => _network.Cancel();
@@ -81,6 +104,18 @@ public sealed class DiagnosticRuntime : IAsyncDisposable
             return;
 
         _network.Cancel();
+        if (_titlesTask is not null)
+        {
+            try
+            {
+                await _titlesTask;
+            }
+            catch (Exception exception)
+            {
+                ConsoleLog.Warn($"Lecture des titres de fenêtres arrêtée ({exception.Message}).");
+            }
+        }
+
         if (_proxyTask is not null)
         {
             try

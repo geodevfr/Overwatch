@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Globalization;
+using System.Text;
 
 namespace GameDiag.Decode;
 
@@ -12,6 +13,8 @@ public sealed class ParsedFrame
     public required Dictionary<string, string> Fields { get; init; }
 
     public required string PayloadHex { get; init; }
+
+    public IReadOnlyList<Dictionary<string, string>>? Entries { get; init; }
 }
 
 public static class FieldExtractor
@@ -21,10 +24,14 @@ public static class FieldExtractor
         var fields = new Dictionary<string, string>(rule.Fields.Length, StringComparer.Ordinal);
         foreach (var field in rule.Fields)
         {
-            if (field.Offset < 0 || field.Size < 0 || field.Offset > message.Length - field.Size)
+            if (!TryReadField(message, field, out var value))
                 continue;
-            fields[field.Name] = Read(message.Slice(field.Offset, field.Size), field);
+            fields[field.Name] = value;
         }
+
+        IReadOnlyList<Dictionary<string, string>>? entries = null;
+        if (rule.Repeat is not null)
+            entries = ExtractEntries(message, rule.Repeat);
 
         var previewLength = previewCap <= 0 ? 0 : Math.Min(message.Length, previewCap);
         return new ParsedFrame
@@ -32,9 +39,79 @@ public static class FieldExtractor
             RuleId = rule.Id,
             Length = message.Length,
             Fields = fields,
-            PayloadHex = Convert.ToHexString(message[..previewLength])
+            PayloadHex = Convert.ToHexString(message[..previewLength]),
+            Entries = entries
         };
     }
+
+    public static bool TryReadUtf8(ReadOnlySpan<byte> message, FieldSpec field, out string text)
+    {
+        text = "";
+        if (field.Offset < 0 || field.Size <= 0 || field.Offset > message.Length - field.Size)
+            return false;
+        return TryDecodeUtf8(message.Slice(field.Offset, field.Size), out text);
+    }
+
+    private static bool TryReadField(ReadOnlySpan<byte> message, FieldSpec field, out string value)
+    {
+        value = "";
+        if (field.Offset < 0 || field.Size < 0 || field.Offset > message.Length - field.Size)
+            return false;
+        if (field.Type == "utf8")
+            return TryDecodeUtf8(message.Slice(field.Offset, field.Size), out value);
+        value = Read(message.Slice(field.Offset, field.Size), field);
+        return true;
+    }
+
+    private static List<Dictionary<string, string>>? ExtractEntries(ReadOnlySpan<byte> message, RepeatSpec repeat)
+    {
+        if (!repeat.TryReadCount(message, out var count))
+            return null;
+        var entries = new List<Dictionary<string, string>>(count);
+        for (var index = 0; index < count; index++)
+        {
+            var start = repeat.EntryOffset + index * repeat.EntrySize;
+            if (start < 0 || repeat.EntrySize < 0 || start > message.Length - repeat.EntrySize)
+                return null;
+            var entryBytes = message.Slice(start, repeat.EntrySize);
+            var entry = new Dictionary<string, string>(repeat.Fields.Length, StringComparer.Ordinal);
+            foreach (var field in repeat.Fields)
+            {
+                if (!TryReadField(entryBytes, field, out var value))
+                    return null;
+                entry[field.Name] = value;
+            }
+
+            entries.Add(entry);
+        }
+
+        return entries;
+    }
+
+    private static bool TryDecodeUtf8(ReadOnlySpan<byte> bytes, out string text)
+    {
+        text = "";
+        var end = bytes.Length;
+        while (end > 0 && bytes[end - 1] == 0)
+            end--;
+        for (var index = 0; index < end; index++)
+        {
+            if (bytes[index] == 0)
+                return false;
+        }
+
+        try
+        {
+            text = StrictUtf8.GetString(bytes[..end]);
+            return true;
+        }
+        catch (DecoderFallbackException)
+        {
+            return false;
+        }
+    }
+
+    private static readonly Encoding StrictUtf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
     private static string Read(ReadOnlySpan<byte> bytes, FieldSpec field)
     {
@@ -73,6 +150,8 @@ public sealed class FrameReassembler
 
     public int ResyncBytes { get; private set; }
 
+    public int Withheld { get; private set; }
+
     public int Overflows { get; private set; }
 
     public int Buffered => _count;
@@ -108,10 +187,20 @@ public sealed class FrameReassembler
             if (outcome.Kind == MatchKind.NeedMore)
                 break;
 
-            if (outcome.Kind == MatchKind.NoMatch)
+            if (outcome.Kind is MatchKind.NoMatch or MatchKind.Resync)
             {
                 offset++;
-                ResyncBytes++;
+                if (outcome.Kind == MatchKind.Resync)
+                    Withheld++;
+                else
+                    ResyncBytes++;
+                continue;
+            }
+
+            if (outcome.Kind == MatchKind.Withhold)
+            {
+                Withheld++;
+                offset += outcome.TotalLength;
                 continue;
             }
 

@@ -63,6 +63,8 @@ public static class ConfigValidator
             errors.Add("decode.max_buffer_bytes doit être au moins 65536, au-dessus de la lecture réseau de 16 Ko.");
         if (config.Decode.MaxPayloadStored < 0)
             errors.Add("decode.max_payload_stored ne peut pas être négatif.");
+        if (config.Decode.SliceMs != 1)
+            errors.Add("decode.slice_ms doit valoir 1 : le décodage avance par tranches d'une milliseconde.");
 
         if (config.Sqlite.FlushIntervalMs < 50)
             errors.Add("sqlite.flush_interval_ms doit être au moins 50.");
@@ -75,6 +77,8 @@ public static class ConfigValidator
             errors.Add("watchdog.latency_warn_ms doit être au moins 1.");
         if (config.Watchdog.ReportIntervalMs < 200)
             errors.Add("watchdog.report_interval_ms doit être au moins 200.");
+        if (config.Windows.Enabled && config.Windows.PollMs < 200)
+            errors.Add("windows.poll_ms doit être au moins 200.");
 
         if (string.IsNullOrWhiteSpace(config.RulesPath))
             errors.Add("rules_path est vide.");
